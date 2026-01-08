@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Git HTTP Browser</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  
+  <script src="./pako.min.js"></script>
+  
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: sans-serif;
+    }
+
+    header {
+      padding: 0.5em;
+      border-bottom: 1px solid #ccc;
+      display: flex;
+      gap: 0.5em;
+    }
+
+    #app {
+      /* display: grid; */
+      grid-template-columns: 1fr 1fr 1fr 2fr;
+      height: calc(100% - 42px);
+    }
+
+    .panes {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .panes.horizontal {
+      flex-direction: row;
+    }
+    
+    .pane {
+      flex: 1 1 auto;
+      min-width: 80px;
+      border-right: 1px solid #ccc;
+      overflow: auto;
+      padding: 0.5em;
+    }
+    
+    .splitter {
+      background: #ccc;
+      z-index: 10;
+    }
+    
+    .horizontal .splitter {
+      width: 6px;
+      cursor: col-resize;
+    }
+    
+    .pane:last-child {
+      border-right: none;
+    }
+
+    ul {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    li {
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+
+    li:hover {
+      background: #eee;
+    }
+
+    pre {
+      white-space: pre;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 900px) {
+      #app {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto auto 1fr;
+      }
+      .pane {
+        border-right: none;
+        border-bottom: 1px solid #ccc;
+      }
+    }
+    
+    .selected {
+      background-color: #007acc22; /* light blue highlight */
+      border-left: 3px solid #007acc; /* accent color */
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <input id="repoUrl" size="50" placeholder="https://example.com/repo.git" />
+    <button id="loadRepo">Load</button>
+    <span id="status"></span>
+  </header>
+
+  <div id="app">
+    <div id="panes" class="panes horizontal">
+      <div class="pane">
+        <h3>Refs</h3>
+        <ul id="refs"></ul>
+      </div>
+      
+      <div class="splitter"></div>
+  
+      <div class="pane">
+        <h3>Commits</h3>
+        <div id="commits-loader">
+          <ul id="commits"></ul>
+        </div>
+      </div>
+      
+      <div class="splitter"></div>
+  
+      <div class="pane">
+        <h3>Tree</h3>
+        <ul id="tree"></ul>
+      </div>
+      
+      <div class="splitter"></div>
+  
+      <div class="pane">
+        <h3>File</h3>
+        <pre id="file"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./gitviewer.js"></script>
+  <script type="module" src="./gitviewer-ui.js"></script>
+</body>
+</html>
