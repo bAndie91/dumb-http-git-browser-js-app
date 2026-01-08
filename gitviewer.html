@@ -5,7 +5,8 @@
   <title>Git HTTP Browser</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
-  <script src="./pako.min.js"></script>
+  <script src="./pako.min.js" sources="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+  <script src="./marked.min.js" sources="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   
   <style>
     html, body {
@@ -22,15 +23,13 @@
     }
 
     #app {
-      /* display: grid; */
-      grid-template-columns: 1fr 1fr 1fr 2fr;
       height: calc(100% - 42px);
     }
 
     .panes {
       display: flex;
       width: 100%;
-      height: 100vh;
+      height: calc(100vh - 42px);
       overflow: hidden;
     }
     
@@ -40,10 +39,29 @@
     
     .pane {
       flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
       min-width: 80px;
+      overflow: hidden;
       border-right: 1px solid #ccc;
+      padding: 0;
+    }
+    
+    .pane > h3 {
+      flex: 0 0 auto;
+      background: #eee;
+      padding: 4px 8px;
+      margin: 0;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    
+    .pane-inner {
       overflow: auto;
-      padding: 0.5em;
+      padding: 0 0.5em;
     }
     
     .splitter {
@@ -60,17 +78,18 @@
       border-right: none;
     }
 
-    ul {
+    ul.dumbgitviewer, .dumbgitviewer ul {
+      margin: 0;
       list-style: none;
       padding-left: 0;
     }
 
-    li {
+    .dumbgitviewer li {
       cursor: pointer;
       padding: 2px 4px;
     }
 
-    li:hover {
+    .dumbgitviewer li:hover {
       background: #eee;
     }
 
@@ -81,10 +100,6 @@
     }
 
     @media (max-width: 900px) {
-      #app {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto auto auto 1fr;
-      }
       .pane {
         border-right: none;
         border-bottom: 1px solid #ccc;
@@ -94,6 +109,10 @@
     .selected {
       background-color: #007acc22; /* light blue highlight */
       border-left: 3px solid #007acc; /* accent color */
+    }
+    
+    .file-content-placeholder {
+      background-color: grey
     }
   </style>
 </head>
@@ -109,15 +128,17 @@
     <div id="panes" class="panes horizontal">
       <div class="pane">
         <h3>Refs</h3>
-        <ul id="refs"></ul>
+        <div class="pane-inner">
+          <ul id="refs" class="dumbgitviewer"></ul>
+        </div>
       </div>
       
       <div class="splitter"></div>
   
       <div class="pane">
         <h3>Commits</h3>
-        <div id="commits-loader">
-          <ul id="commits"></ul>
+        <div id="commits-loader" class="pane-inner">
+          <ul id="commits" class="dumbgitviewer"></ul>
         </div>
       </div>
       
@@ -125,14 +146,18 @@
   
       <div class="pane">
         <h3>Tree</h3>
-        <ul id="tree"></ul>
+        <div class="pane-inner">
+          <ul id="tree" class="dumbgitviewer"></ul>
+        </div>
       </div>
       
       <div class="splitter"></div>
   
       <div class="pane">
         <h3>File</h3>
-        <pre id="file"></pre>
+        <div class="pane-inner">
+          <div id="file"></div>
+        </div>
       </div>
     </div>
   </div>
