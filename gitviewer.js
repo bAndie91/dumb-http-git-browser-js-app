@@ -38,32 +38,208 @@ async function listRefs(repoUrl) {
   return refs
 }
 
-// naive directory listing fallback
-async function tryListDir(url) {
-  // dumb HTTP servers do NOT standardize this
-  // so this is best-effort and optional
-  return []
-}
-
 /* -----------------------------
    Dumb HTTP: objects
 ----------------------------- */
 async function readObject(repoUrl, oid) {
-  const dir = oid.slice(0, 2)
-  const file = oid.slice(2)
+  try {
+    const dir = oid.slice(0, 2)
+    const file = oid.slice(2)
+  
+    const compressed = await fetchBinary(
+      `${repoUrl}/objects/${dir}/${file}`
+    )
+  
+    const data = pako.inflate(compressed)
+    const nul = data.indexOf(0)
+  
+    const header = new TextDecoder().decode(data.slice(0, nul))
+    const body = data.slice(nul + 1)
+  
+    const [type, size] = header.split(' ')
+    return { type, size: +size, body }
+  } catch (err) {
+    console.log("failed to read loose object: " + err.message)
+  }
+  
+  // try packfiles
+  const hit = findInPack(oid)
+  if (!hit) throw new Error(`Object ${oid} neither found in packfiles`)
+  return readPackedObject(hit.pack, hit.offset)
+}
 
-  const compressed = await fetchBinary(
-    `${repoUrl}/objects/${dir}/${file}`
-  )
+async function loadPackList(repoUrl) {
+  const text = await fetchText(`${repoUrl}/objects/info/packs`)
+  const packs = []
 
-  const data = pako.inflate(compressed)
-  const nul = data.indexOf(0)
+  for (const line of text.split('\n')) {
+    if (line.startsWith('P pack-')) {
+      packs.push(line.slice(2).trim())
+    }
+  }
 
-  const header = new TextDecoder().decode(data.slice(0, nul))
-  const body = data.slice(nul + 1)
+  return packs.map(p => p.replace(/\.pack$/, ''))
+}
 
-  const [type, size] = header.split(' ')
-  return { type, size: +size, body }
+function readUint32BE(buf, off) {
+  return (
+    (buf[off] << 24) |
+    (buf[off + 1] << 16) |
+    (buf[off + 2] << 8) |
+    buf[off + 3]
+  ) >>> 0
+}
+
+function readHex(buf, off, len) {
+  let s = ''
+  for (let i = 0; i < len; i++) {
+    s += buf[off + i].toString(16).padStart(2, '0')
+  }
+  return s
+}
+
+async function loadPack(base) {
+  const [idxBuf, packBuf] = await Promise.all([
+    fetch(`${state.repoUrl}/objects/pack/${base}.idx`).then(r => r.arrayBuffer()),
+    fetch(`${state.repoUrl}/objects/pack/${base}.pack`).then(r => r.arrayBuffer())
+  ])
+
+  const idx = new Uint8Array(idxBuf)
+  const pack = new Uint8Array(packBuf)
+
+  let pos = 0
+
+  // ---- header ----
+  if (
+    idx[pos] !== 0xff ||
+    idx[pos + 1] !== 0x74 ||
+    idx[pos + 2] !== 0x4f ||
+    idx[pos + 3] !== 0x63
+  ) {
+    throw new Error('Invalid idx signature: '+idx[pos]+","+idx[pos+1]+","+idx[pos+2]+","+idx[pos+3])
+  }
+  pos += 4
+
+  const version = readUint32BE(idx, pos)
+  pos += 4
+  if (version !== 2) {
+    throw new Error(`Unsupported idx version ${version}`)
+  }
+
+  // ---- fanout ----
+  const fanout = new Uint32Array(256)
+  for (let i = 0; i < 256; i++) {
+    fanout[i] = readUint32BE(idx, pos)
+    pos += 4
+  }
+
+  const objectCount = fanout[255]
+
+  // ---- object IDs ----
+  const oids = new Array(objectCount)
+  for (let i = 0; i < objectCount; i++) {
+    oids[i] = readHex(idx, pos, 20)
+    pos += 20
+  }
+
+  // ---- CRCs (skip) ----
+  pos += objectCount * 4
+
+  // ---- raw offsets ----
+  const rawOffsets = new Array(objectCount)
+  for (let i = 0; i < objectCount; i++) {
+    rawOffsets[i] = readUint32BE(idx, pos)
+    pos += 4
+  }
+
+  // ---- resolve offsets ----
+  const offsets = new Array(objectCount)
+  const largeOffsetsBase = pos
+
+  for (let i = 0; i < objectCount; i++) {
+    const o = rawOffsets[i]
+    if (o & 0x80000000) {
+      const n = o & 0x7fffffff
+      const hi = readUint32BE(idx, largeOffsetsBase + n * 8)
+      const lo = readUint32BE(idx, largeOffsetsBase + n * 8 + 4)
+      offsets[i] = hi * 2 ** 32 + lo
+    } else {
+      offsets[i] = o
+    }
+  }
+
+  // ---- build lookup map ----
+  const objects = new Map()
+  for (let i = 0; i < objectCount; i++) {
+    objects.set(oids[i], offsets[i])
+  }
+
+  // ---- register packfile ----
+  state.packfiles.push({
+    base,
+    pack,
+    objects
+  })
+}
+
+function findInPack(oidHex) {
+  const oid = hexToBytes(oidHex)
+
+  for (const p of state.packfiles) {
+    const first = oid[0]
+    const lo = first === 0 ? 0 : p.fanout[first - 1]
+    const hi = p.fanout[first]
+
+    for (let i = lo; i < hi; i++) {
+      const o = p.oids.slice(i * 20, i * 20 + 20)
+      if (equalBytes(o, oid)) {
+        return { pack: p.pack, offset: p.offsets[i] }
+      }
+    }
+  }
+  return null
+}
+
+function hexToBytes(hex) {
+  const a = new Uint8Array(20)
+  for (let i = 0; i < 20; i++)
+    a[i] = parseInt(hex.substr(i * 2, 2), 16)
+  return a
+}
+
+function equalBytes(a, b) {
+  for (let i = 0; i < a.length; i++)
+    if (a[i] !== b[i]) return false
+  return true
+}
+
+function readPackedObject(pack, offset) {
+  let i = offset
+  let c = pack[i++]
+
+  const type = (c >> 4) & 7
+  let size = c & 15
+  let shift = 4
+
+  while (c & 0x80) {
+    c = pack[i++]
+    size |= (c & 0x7f) << shift
+    shift += 7
+  }
+
+  const compressed = pack.slice(i)
+  const body = pako.inflate(compressed)
+
+  return { type: packType(type), body }
+}
+
+function packType(t) {
+  return {
+    1: 'commit',
+    2: 'tree',
+    3: 'blob',
+    4: 'tag'
+  }[t]
 }
 
 /* -----------------------------
@@ -108,6 +284,7 @@ const state = {
   autoLoadedRef: false,
   
   treeObjects: [],   // list of {mode, type, oid, path} of the current commit
+  packfiles: [],
   
   selectedRefEl: null,
   selectedCommitEl: null,
@@ -187,6 +364,10 @@ async function loadMoreCommits() {
 
     const commit = parseCommit(obj.body)
     renderCommit(oid, commit)
+
+    if(oid == state.headOid) {
+      selectCommit(oid)
+    }
 
     if (commit.parent) {
       state.commitQueue.push(commit.parent)
@@ -311,7 +492,7 @@ mdRenderer.link = function(obj) {
   {
     // make a safe escaped link text
     const escapedText = obj.text || obj.href
-    return `<a href="#" data-md-link="${obj.href}" title="${obj.title || obj.href}">${escapedText}</a>`
+    return `<a href="#${obj.href}" data-md-link="${obj.href}" title="${obj.title || obj.href}">${escapedText}</a>`
     // TODO: let href be a permalink
   }
   return defaultMdRenderer.link.call(this, obj)
@@ -368,57 +549,53 @@ async function selectFile(path) {
     return
   }
 
-  try {
-    const blobObj = await readObject(state.repoUrl, entry.oid)
-    if (blobObj.type !== 'blob') throw new Error('Not a blob object')
+  const blobObj = await readObject(state.repoUrl, entry.oid)
+  if (blobObj.type !== 'blob') throw new Error('Not a blob object')
 
-    const body = blobObj.body
+  const body = blobObj.body
 
-    // handle rendering
-    const container = $('file')
-    if (isImage(body, path)) {
-      const blob = new Blob([body], { type: mimeTypeFromFilename(path) })
-      const url = URL.createObjectURL(blob)
-      const img = document.createElement('img')
-      img.src = url
-      img.style.maxWidth = '100%'
-      img.style.height = 'auto'
-      container.appendChild(img)
-    }
-    else if (isText(body)) {
-      if (path.toLowerCase().endsWith('.md')) {
-        // markdown
-        renderMarkdown(container, new TextDecoder().decode(body))
-      } else {
-        // plain text
-        const pre = document.createElement('pre')
-        pre.textContent = new TextDecoder().decode(body)
-        container.appendChild(pre)
-        // TODO: add line numbering
-      }
-    }
-    else {
-      const blob = new Blob([body], { type: 'application/octet-stream' })
-      const url = URL.createObjectURL(blob)
-      const sizeKB = (body.length / 1024).toFixed(1)
-      const btn = document.createElement('button')
-      btn.textContent = `Download binary blob (${sizeKB} kB)`
-      btn.onclick = () => {
-        const a = document.createElement('a')
-        a.href = url
-        a.download = path
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        setTimeout(() => URL.revokeObjectURL(url), 1000)
-      }
-      container.appendChild(btn)
-    }
-
-    status('')
-  } catch (err) {
-    status(err.message)
+  // handle rendering
+  const container = $('file')
+  if (isImage(body, path)) {
+    const blob = new Blob([body], { type: mimeTypeFromFilename(path) })
+    const url = URL.createObjectURL(blob)
+    const img = document.createElement('img')
+    img.src = url
+    img.style.maxWidth = '100%'
+    img.style.height = 'auto'
+    container.appendChild(img)
   }
+  else if (isText(body)) {
+    if (path.toLowerCase().endsWith('.md')) {
+      // markdown
+      renderMarkdown(container, new TextDecoder().decode(body))
+    } else {
+      // plain text
+      const pre = document.createElement('pre')
+      pre.textContent = new TextDecoder().decode(body)
+      container.appendChild(pre)
+      // TODO: add line numbering
+    }
+  }
+  else {
+    const blob = new Blob([body], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const sizeKB = (body.length / 1024).toFixed(1)
+    const btn = document.createElement('button')
+    btn.textContent = `Download binary blob (${sizeKB} kB)`
+    btn.onclick = () => {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = path
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
+    container.appendChild(btn)
+  }
+
+  status('')
 }
 
 function isText(uint8arr) {
@@ -448,6 +625,29 @@ function mimeTypeFromFilename(filename) {
   }
 }
 
+async function loadPackfiles() {
+    state.packfiles = []
+    const packs = await loadPackList(state.repoUrl)
+    for (const base of packs) {
+      await loadPack(base)
+    }
+}
+
+async function loadRepo(repoUrl) {
+  try {
+    const prevRepoUrl = state.repoUrl
+    state.repoUrl = repoUrl
+    if(prevRepoUrl != repoUrl) {
+      state.autoLoadedRef = true
+    }
+    await loadPackfiles()
+    await loadRefs()
+  } catch (e) {
+    console.log(e)
+    status("Error: " + e.message)
+  }
+}
+
 /* -----------------------------
    Startup
 ----------------------------- */
@@ -460,22 +660,14 @@ function init() {
   }
 
   const repo = params.get('repo')
-  if (repo) {
-    state.repoUrl = repo
+  if(repo) {
+    $('repoUrl').value = repo
+    loadRepo(repo)
   }
-  
-  $('repoUrl').value = state.repoUrl
-  $('loadRepo').onclick = () => {
+  $('loadRepoBtn').onclick = () => {
     const url = $('repoUrl').value.trim()
-    const prevRepoUrl = state.repoUrl
-    if (url) state.repoUrl = url
-    if(prevRepoUrl != url) {
-      state.autoLoadedRef = true
-    }
-    loadRefs().catch(e => status(e.message))
+    loadRepo(url)
   }
-  
-  loadRefs().catch(e => status(e.message))
 }
 
 init()
