@@ -11,6 +11,15 @@ async function fetchBinary(url) {
   return new Uint8Array(await r.arrayBuffer())
 }
 
+async function fetchLooseGitObject(url) {  
+  try {
+    return await fetchBinary(url)
+  } catch (err) {
+    console.log("failed to read loose object: " + err.message)
+  }
+  return null
+}
+
 /* -----------------------------
    Dumb HTTP: refs
 ----------------------------- */
@@ -42,14 +51,12 @@ async function listRefs(repoUrl) {
    Dumb HTTP: objects
 ----------------------------- */
 async function readObject(repoUrl, oid) {
-  try {
-    const dir = oid.slice(0, 2)
-    const file = oid.slice(2)
+  const dir = oid.slice(0, 2)
+  const file = oid.slice(2)
+  const compressed = await fetchLooseGitObject(`${repoUrl}/objects/${dir}/${file}`)
   
-    const compressed = await fetchBinary(
-      `${repoUrl}/objects/${dir}/${file}`
-    )
-  
+  if(compressed !== null)
+  {
     const data = pako.inflate(compressed)
     const nul = data.indexOf(0)
   
@@ -58,8 +65,6 @@ async function readObject(repoUrl, oid) {
   
     const [type, size] = header.split(' ')
     return { type, size: +size, body }
-  } catch (err) {
-    console.log("failed to read loose object: " + err.message)
   }
   
   // try packfiles
@@ -88,14 +93,6 @@ function readUint32BE(buf, off) {
     (buf[off + 2] << 8) |
     buf[off + 3]
   ) >>> 0
-}
-
-function readHex(buf, off, len) {
-  let s = ''
-  for (let i = 0; i < len; i++) {
-    s += buf[off + i].toString(16).padStart(2, '0')
-  }
-  return s
 }
 
 async function loadPack(base) {
@@ -136,9 +133,9 @@ async function loadPack(base) {
   const objectCount = fanout[255]
 
   // ---- object IDs ----
-  const oids = new Array(objectCount)
+  const oids = new Uint8Array(objectCount * 20)
   for (let i = 0; i < objectCount; i++) {
-    oids[i] = readHex(idx, pos, 20)
+    oids.set(idx.subarray(pos, pos + 20), i * 20)
     pos += 20
   }
 
@@ -178,7 +175,9 @@ async function loadPack(base) {
   state.packfiles.push({
     base,
     pack,
-    objects
+    fanout,
+    oids,
+    offsets,
   })
 }
 
@@ -193,7 +192,7 @@ function findInPack(oidHex) {
     for (let i = lo; i < hi; i++) {
       const o = p.oids.slice(i * 20, i * 20 + 20)
       if (equalBytes(o, oid)) {
-        return { pack: p.pack, offset: p.offsets[i] }
+        return { pack: p.pack, offset: p.offsets[i], }
       }
     }
   }
@@ -217,8 +216,13 @@ function readPackedObject(pack, offset) {
   let i = offset
   let c = pack[i++]
 
-  const type = (c >> 4) & 7
-  let size = c & 15
+  const typeNum = (c >> 4) & 7
+  const type = packType(typeNum)
+  if (type.match(/DELTA/)) {
+    throw new Error("Delta object: not yet supported")
+  }
+
+  let size = c & 0x0f
   let shift = 4
 
   while (c & 0x80) {
@@ -227,10 +231,12 @@ function readPackedObject(pack, offset) {
     shift += 7
   }
 
-  const compressed = pack.slice(i)
-  const body = pako.inflate(compressed)
+  // Now i points to start of compressed data
+  const compressedStart = i
+  // Use streaming decompression to find exact boundary
+  const decompressed = decompressPackedObject(pack, compressedStart, size)
 
-  return { type: packType(type), body }
+  return { type, body: decompressed }
 }
 
 function packType(t) {
@@ -238,8 +244,79 @@ function packType(t) {
     1: 'commit',
     2: 'tree',
     3: 'blob',
-    4: 'tag'
+    4: 'tag',
+    6: 'OFS_DELTA',
+    7: 'REF_DELTA',
   }[t]
+}
+
+function decompressPackedObject(pack, start, expectedSize) {
+  const b1 = pack[start]
+  const b2 = pack[start + 1]
+  
+  console.log('=== DECOMPRESSION DEBUG ===')
+  console.log(`Start offset: ${start}`)
+  console.log(`Expected size: ${expectedSize}`)
+  console.log(`First bytes: ${Array.from(pack.slice(start, start + 20)).map(b => b.toString(16).padStart(2,'0')).join(' ')}`)
+  
+  // For 78 9c, skip the 2-byte zlib header and use raw deflate
+  // This avoids pako's header validation entirely
+  const isZlib = (b1 === 0x78 && [0x01, 0x5e, 0x9c, 0xda].includes(b2))
+  
+  if (isZlib) {
+    console.log('Detected zlib wrapper - stripping header and using raw deflate')
+    // Skip 2-byte zlib header, decompress the raw deflate stream
+    return decompressPackedObjectRaw(pack, start + 2, expectedSize)
+  } else {
+    console.log('Using raw deflate from start')
+    return decompressPackedObjectRaw(pack, start, expectedSize)
+  }
+}
+
+function decompressPackedObjectRaw(pack, start, expectedSize) {
+  // Binary search for the right amount of compressed data
+  let lo = Math.floor(expectedSize * 0.3)
+  let hi = Math.min(pack.length - start, expectedSize * 5)
+  let bestResult = null
+  
+  console.log(`Binary searching between ${lo} and ${hi} bytes`)
+  
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2)
+    
+    try {
+      // Use raw deflate (no zlib wrapper)
+      const inflator = new pako.Inflate({ raw: true })
+      const chunk = pack.subarray(start, start + mid)
+      inflator.push(chunk, true)
+      
+      if (inflator.err) {
+        console.log(`${mid} bytes: error - ${inflator.msg}`)
+        lo = mid + 1
+        continue
+      }
+      
+      const result = inflator.result
+      console.log(`${mid} bytes: decompressed ${result.length} bytes`)
+      
+      if (result.length >= expectedSize) {
+        bestResult = result
+        hi = mid - 1  // Try smaller
+      } else {
+        lo = mid + 1  // Need more
+      }
+    } catch (err) {
+      console.log(`${mid} bytes: exception - ${err.message}`)
+      lo = mid + 1
+    }
+  }
+  
+  if (bestResult && bestResult.length >= expectedSize) {
+    console.log(`Success! Using ${bestResult.length} decompressed bytes`)
+    return bestResult.subarray(0, expectedSize)
+  }
+  
+  throw new Error(`Could not decompress: best result was ${bestResult?.length || 0} bytes, needed ${expectedSize}`)
 }
 
 /* -----------------------------
@@ -311,17 +388,17 @@ async function loadRefs() {
   }
 
   status('')
-
+  
   // auto-select ref from URL
   var autoloadRef = new URLSearchParams(location.search).get('ref')
   if (autoloadRef) {
     autoloadRef = 'refs/'+autoloadRef
   }
   if (!autoloadRef || state.autoLoadedRef) {
-    selectRef(state.headRef)
+    await selectRef(state.headRef)
   }
   if(autoloadRef && refs.includes(autoloadRef) && !state.autoLoadedRef) {
-    selectRef(autoloadRef)
+    await selectRef(autoloadRef)
     state.autoLoadedRef = true
   }
 }
