@@ -11,7 +11,7 @@ async function fetchBinary(url) {
   return new Uint8Array(await r.arrayBuffer())
 }
 
-async function fetchLooseGitObject(url) {  
+async function fetchLooseGitObject(url) {
   try {
     return await fetchBinary(url)
   } catch (err) {
@@ -316,7 +316,7 @@ function decompressPackedObjectRaw(pack, start, expectedSize) {
     return bestResult.subarray(0, expectedSize)
   }
   
-  throw new Error(`Could not decompress: best result was ${bestResult?.length || 0} bytes, needed ${expectedSize}`)
+  throw new Error(`Could not decompress: best result was ${bestResult ? bestResult.length : undefined} bytes, needed ${expectedSize}`)
 }
 
 /* -----------------------------
@@ -383,7 +383,7 @@ async function loadRefs() {
     const li = document.createElement('li')
     li.setAttribute('data-ref', ref)
     li.textContent = ref.replace(/^refs\//, '')
-    li.onclick = () => selectRef(ref)
+    li.onclick = () => reportException(selectRef, ref)
     $('refs').appendChild(li)
   }
 
@@ -429,11 +429,11 @@ async function selectRef(ref) {
 /* -----------------------------
    Commit log (paged)
 ----------------------------- */
-async function loadMoreCommits() {
+async function loadMoreCommits(loadAll) {
   status('Loading commits…')
 
   let count = 0
-  while (state.commitQueue.length && count < COMMITS_PER_PAGE) {
+  while (state.commitQueue.length && (loadAll || count < COMMITS_PER_PAGE)) {
     const oid = state.commitQueue.shift()
     const obj = await readObject(state.repoUrl, oid)
 
@@ -462,21 +462,30 @@ async function loadMoreCommits() {
 }
 
 function updateLoadMoreButton() {
-  let btn = document.getElementById('loadMore')
+  let btnMore = document.getElementById('loadMoreBtn')
+  let btnAll = document.getElementById('loadAllBtn')
 
   // No more commits → remove button
   if (state.reachedRoot || state.commitQueue.length === 0) {
-    if (btn) btn.remove()
+    if (btnMore) btnMore.remove()
+    if (btnAll) btnAll.remove()
     return
   }
 
   // Otherwise ensure button exists
-  if (!btn) {
-    btn = document.createElement('button')
-    btn.id = 'loadMore'
-    btn.textContent = 'Load more'
-    btn.onclick = loadMoreCommits
-    $('commits-loader').appendChild(btn)
+  if (!btnMore) {
+    btnMore = document.createElement('button')
+    btnMore.id = 'loadMoreBtn'
+    btnMore.textContent = 'Load more'
+    btnMore.onclick = () => reportException(loadMoreCommits, false)
+    $('commits-loader').appendChild(btnMore)
+  }
+  if (!btnAll) {
+    btnAll = document.createElement('button')
+    btnAll.id = 'loadAllBtn'
+    btnAll.textContent = 'Load All'
+    btnAll.onclick = () => reportException(loadMoreCommits, true)
+    $('commits-loader').appendChild(btnAll)
   }
 }
 
@@ -484,7 +493,7 @@ function renderCommit(oid, commit) {
   const li = document.createElement('li')
   li.setAttribute('data-commithash', oid)
   li.textContent = `${oid.slice(0, 7)} — ${commit.message.split('\n')[0]}`
-  li.onclick = () => selectCommit(oid)
+  li.onclick = () => reportException(selectCommit, oid)
   $('commits').appendChild(li)
 }
 
@@ -555,7 +564,7 @@ function renderTree() {
     li.textContent = entry.path + (entry.type === 'tree' ? '/' : '')
     li.setAttribute('data-filepath', entry.path)
     if (entry.type === 'blob') {
-      li.onclick = () => selectFile(entry.path)
+      li.onclick = () => reportException(selectFile, entry.path)
     }
     container.appendChild(li)
   }
@@ -711,17 +720,23 @@ async function loadPackfiles() {
 }
 
 async function loadRepo(repoUrl) {
+  const prevRepoUrl = state.repoUrl
+  state.repoUrl = repoUrl
+  if(prevRepoUrl != repoUrl) {
+    state.autoLoadedRef = true
+  }
+  await loadPackfiles()
+  await loadRefs()
+}
+
+async function reportException(func, ...args) {
   try {
-    const prevRepoUrl = state.repoUrl
-    state.repoUrl = repoUrl
-    if(prevRepoUrl != repoUrl) {
-      state.autoLoadedRef = true
-    }
-    await loadPackfiles()
-    await loadRefs()
+    const result = await func(...args)
+    return result
   } catch (e) {
     console.log(e)
     status("Error: " + e.message)
+    throw e
   }
 }
 
@@ -739,11 +754,11 @@ function init() {
   const repo = params.get('repo')
   if(repo) {
     $('repoUrl').value = repo
-    loadRepo(repo)
+    reportException(loadRepo, repo)
   }
   $('loadRepoBtn').onclick = () => {
     const url = $('repoUrl').value.trim()
-    loadRepo(url)
+    reportException(loadRepo, url)
   }
 }
 
