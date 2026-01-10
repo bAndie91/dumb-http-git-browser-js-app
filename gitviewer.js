@@ -696,7 +696,7 @@ function isText(uint8arr) {
 
 function isImage(uint8arr, filename) {
   const ext = filename.split('.').pop().toLowerCase()
-  return ['png','jpg','jpeg','gif','bmp','webp'].includes(ext)
+  return ['png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext)
 }
 
 function mimeTypeFromFilename(filename) {
@@ -707,6 +707,7 @@ function mimeTypeFromFilename(filename) {
     case 'gif': return 'image/gif'
     case 'bmp': return 'image/bmp'
     case 'webp': return 'image/webp'
+    case 'svg': return 'image/svg+xml'
     default: return 'application/octet-stream'
   }
 }
