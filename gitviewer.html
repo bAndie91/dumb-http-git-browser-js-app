@@ -109,14 +109,22 @@
     .selected {
       background-color: #007acc22; /* light blue highlight */
       border-left: 3px solid #007acc; /* accent color */
-    }
-    
-    .file-content-placeholder {
-      background-color: grey
+      margin-left: -3px;
     }
     
     #commits-loader button {
       margin: 0.25em;
+    }
+    
+    .file-content-placeholder {
+      background-color: grey;
+    }
+    
+    .renderPOD .pod-command-unknown {
+      background-color: lightgrey;
+    }
+    .renderPOD em {
+      color: red;
     }
   </style>
 </head>
@@ -166,7 +174,7 @@
     </div>
   </div>
 
-  <script type="module" src="./gitviewer.js"></script>
   <script type="module" src="./gitviewer-ui.js"></script>
+  <script type="module" src="./gitviewer.js"></script>
 </body>
 </html>

@@ -1,4 +1,13 @@
 
+import { hexToBytes, bytesToHex, equalBytes } from './gitviewer-util.js'
+import { renderPOD } from './gitviewer-render-pod.js'
+import { renderMarkdown } from './gitviewer-render-md.js'
+import { renderMan } from './gitviewer-render-man.js'
+
+const debug_pack_decompress = false
+const objectCache = new Map(); // key: oidHex OR packOffset
+
+
 async function fetchText(url) {
   const r = await fetch(url)
   if (!r.ok) throw new Error(`${r.status} ${url}`)
@@ -50,11 +59,16 @@ async function listRefs(repoUrl) {
 /* -----------------------------
    Dumb HTTP: objects
 ----------------------------- */
-async function readObject(repoUrl, oid) {
+async function readObjectUnverified(repoUrl, oid) {
+  // try packfiles first
+  const hit = findInPack(oid)
+  if (hit) {
+    return readPackedObject(hit.pack, hit.offset)
+  }
+  
   const dir = oid.slice(0, 2)
   const file = oid.slice(2)
   const compressed = await fetchLooseGitObject(`${repoUrl}/objects/${dir}/${file}`)
-  
   if(compressed !== null)
   {
     const data = pako.inflate(compressed)
@@ -67,10 +81,16 @@ async function readObject(repoUrl, oid) {
     return { type, size: +size, body }
   }
   
-  // try packfiles
-  const hit = findInPack(oid)
-  if (!hit) throw new Error(`Object ${oid} neither found in packfiles`)
-  return readPackedObject(hit.pack, hit.offset)
+  throw new Error(`Object ${oid} found neither in packfiles nor as loose object`)
+}
+
+async function readObject(repoUrl, oid) {
+  const obj = await readObjectUnverified(repoUrl, oid)
+  const verifyChecksum = await hashGitObject(obj.type, obj.body);
+  if (verifyChecksum !== oid) {
+    throw new Error(`SHA1 mismatch: object ${oid} calcualted checksum is ${verifyChecksum}`);
+  }
+  return obj
 }
 
 async function loadPackList(repoUrl) {
@@ -95,12 +115,23 @@ function readUint32BE(buf, off) {
   ) >>> 0
 }
 
-async function loadPack(base) {
-  const [idxBuf, packBuf] = await Promise.all([
-    fetch(`${state.repoUrl}/objects/pack/${base}.idx`).then(r => r.arrayBuffer()),
-    fetch(`${state.repoUrl}/objects/pack/${base}.pack`).then(r => r.arrayBuffer())
-  ])
+function readVarInt(buf, posObj) {
+  let result = 0;
+  let shift = 0;
+  let byte;
 
+  do {
+    byte = buf[posObj.pos++];
+    result |= (byte & 0x7f) << shift;
+    shift += 7;
+  } while (byte & 0x80);
+
+  return result;
+}
+
+async function loadPack(base) {
+  const idxBuf = await fetch(`${state.repoUrl}/objects/pack/${base}.idx`).then(r => r.arrayBuffer())
+  const packBuf = await fetch(`${state.repoUrl}/objects/pack/${base}.pack`).then(r => r.arrayBuffer())
   const idx = new Uint8Array(idxBuf)
   const pack = new Uint8Array(packBuf)
 
@@ -170,6 +201,8 @@ async function loadPack(base) {
   for (let i = 0; i < objectCount; i++) {
     objects.set(oids[i], offsets[i])
   }
+  
+  verifyPackChecksum(base, pack)
 
   // ---- register packfile ----
   state.packfiles.push({
@@ -179,6 +212,18 @@ async function loadPack(base) {
     oids,
     offsets,
   })
+}
+
+async function verifyPackChecksum(packBaseName, packBytes) {
+  const content = packBytes.subarray(0, packBytes.length - 20);
+  const expected = packBytes.subarray(packBytes.length - 20);
+
+  const digest = await crypto.subtle.digest('SHA-1', content);
+  const actual = new Uint8Array(digest);
+
+  if (!equalBytes(actual, expected)) {
+    throw new Error(`Pack ${packBaseName} calculated checksum ${digest} mismatch stored ${expected} checksum`);
+  }
 }
 
 function findInPack(oidHex) {
@@ -199,28 +244,12 @@ function findInPack(oidHex) {
   return null
 }
 
-function hexToBytes(hex) {
-  const a = new Uint8Array(20)
-  for (let i = 0; i < 20; i++)
-    a[i] = parseInt(hex.substr(i * 2, 2), 16)
-  return a
-}
-
-function equalBytes(a, b) {
-  for (let i = 0; i < a.length; i++)
-    if (a[i] !== b[i]) return false
-  return true
-}
-
-function readPackedObject(pack, offset) {
+async function readPackedObject(pack, offset) {
   let i = offset
   let c = pack[i++]
 
   const typeNum = (c >> 4) & 7
   const type = packType(typeNum)
-  if (type.match(/DELTA/)) {
-    throw new Error("Delta object: not yet supported")
-  }
 
   let size = c & 0x0f
   let shift = 4
@@ -231,12 +260,89 @@ function readPackedObject(pack, offset) {
     shift += 7
   }
 
+  let baseOid = null
+  let baseOffset = null
+  
+  if(type == 'OFS_DELTA') {
+    c = pack[i++];
+    let val = c & 0x7f;
+    while (c & 0x80) {
+      val += 1;
+      c = pack[i++];
+      val = (val << 7) + (c & 0x7f);
+    }
+    baseOffset = offset - val;
+  }
+  
+  if(type == 'REF_DELTA') {
+    baseOid = pack.slice(i, i + 20);
+    i += 20;
+  }
+  
   // Now i points to start of compressed data
   const compressedStart = i
   // Use streaming decompression to find exact boundary
   const decompressed = decompressPackedObject(pack, compressedStart, size)
+  if(!type.match(/DELTA/)) {
+    return { type, body: decompressed }
+  }
 
-  return { type, body: decompressed }
+  let pos = { pos: 0 };
+  const baseSize = readVarInt(decompressed, pos);
+  const resultSize = readVarInt(decompressed, pos);
+  const instructions = decompressed.subarray(pos.pos);
+  
+  let base;
+  if(type == 'OFS_DELTA') {
+    base = await readPackedObject(pack, baseOffset)
+  }
+  else {
+    base = await readObject(state.repoUrl, bytesToHex(baseOid))
+  }
+  const result = applyDelta(base.body, instructions, resultSize);
+  return { type: base.type, body: result };
+}
+
+function applyDelta(base, instructions, resultSize) {
+  const out = new Uint8Array(resultSize);
+  let outPos = 0;
+  let p = 0;
+
+  while (p < instructions.length) {
+    const op = instructions[p++];
+
+    // INSERT
+    if ((op & 0x80) === 0) {
+      const len = op;
+      out.set(instructions.subarray(p, p + len), outPos);
+      p += len;
+      outPos += len;
+      continue;
+    }
+
+    // COPY
+    let cpOff = 0;
+    let cpSize = 0;
+
+    if (op & 0x01) cpOff |= instructions[p++] << 0;
+    if (op & 0x02) cpOff |= instructions[p++] << 8;
+    if (op & 0x04) cpOff |= instructions[p++] << 16;
+    if (op & 0x08) cpOff |= instructions[p++] << 24;
+
+    if (op & 0x10) cpSize |= instructions[p++] << 0;
+    if (op & 0x20) cpSize |= instructions[p++] << 8;
+    if (op & 0x40) cpSize |= instructions[p++] << 16;
+    if (cpSize === 0) cpSize = 0x10000;
+
+    out.set(base.subarray(cpOff, cpOff + cpSize), outPos);
+    outPos += cpSize;
+  }
+
+  if (outPos !== resultSize) {
+    throw new Error(`Delta size mismatch: expected ${resultSize}, got ${outPos}`);
+  }
+
+  return out;
 }
 
 function packType(t) {
@@ -254,21 +360,23 @@ function decompressPackedObject(pack, start, expectedSize) {
   const b1 = pack[start]
   const b2 = pack[start + 1]
   
-  console.log('=== DECOMPRESSION DEBUG ===')
-  console.log(`Start offset: ${start}`)
-  console.log(`Expected size: ${expectedSize}`)
-  console.log(`First bytes: ${Array.from(pack.slice(start, start + 20)).map(b => b.toString(16).padStart(2,'0')).join(' ')}`)
+  if(debug_pack_decompress) {
+    console.log('=== DECOMPRESSION DEBUG ===')
+    console.log(`Start offset: ${start}`)
+    console.log(`Expected size: ${expectedSize}`)
+    console.log(`First bytes: ${Array.from(pack.slice(start, start + 20)).map(b => b.toString(16).padStart(2,'0')).join(' ')}`)
+  }
   
   // For 78 9c, skip the 2-byte zlib header and use raw deflate
   // This avoids pako's header validation entirely
   const isZlib = (b1 === 0x78 && [0x01, 0x5e, 0x9c, 0xda].includes(b2))
   
   if (isZlib) {
-    console.log('Detected zlib wrapper - stripping header and using raw deflate')
+    if(debug_pack_decompress) console.log('Detected zlib wrapper - stripping header and using raw deflate')
     // Skip 2-byte zlib header, decompress the raw deflate stream
     return decompressPackedObjectRaw(pack, start + 2, expectedSize)
   } else {
-    console.log('Using raw deflate from start')
+    if(debug_pack_decompress) console.log('Using raw deflate from start')
     return decompressPackedObjectRaw(pack, start, expectedSize)
   }
 }
@@ -279,7 +387,7 @@ function decompressPackedObjectRaw(pack, start, expectedSize) {
   let hi = Math.min(pack.length - start, expectedSize * 5)
   let bestResult = null
   
-  console.log(`Binary searching between ${lo} and ${hi} bytes`)
+  if(debug_pack_decompress) console.log(`Binary searching between ${lo} and ${hi} bytes`)
   
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2)
@@ -291,13 +399,13 @@ function decompressPackedObjectRaw(pack, start, expectedSize) {
       inflator.push(chunk, true)
       
       if (inflator.err) {
-        console.log(`${mid} bytes: error - ${inflator.msg}`)
+        if(debug_pack_decompress) console.log(`${mid} bytes: error - ${inflator.msg}`)
         lo = mid + 1
         continue
       }
       
       const result = inflator.result
-      console.log(`${mid} bytes: decompressed ${result.length} bytes`)
+      if(debug_pack_decompress) console.log(`${mid} bytes: decompressed ${result.length} bytes`)
       
       if (result.length >= expectedSize) {
         bestResult = result
@@ -306,17 +414,29 @@ function decompressPackedObjectRaw(pack, start, expectedSize) {
         lo = mid + 1  // Need more
       }
     } catch (err) {
-      console.log(`${mid} bytes: exception - ${err.message}`)
+      if(debug_pack_decompress) console.log(`${mid} bytes: exception - ${err.message}`)
       lo = mid + 1
     }
   }
   
   if (bestResult && bestResult.length >= expectedSize) {
-    console.log(`Success! Using ${bestResult.length} decompressed bytes`)
+    if(debug_pack_decompress) console.log(`Success! Using ${bestResult.length} decompressed bytes`)
     return bestResult.subarray(0, expectedSize)
   }
   
   throw new Error(`Could not decompress: best result was ${bestResult ? bestResult.length : undefined} bytes, needed ${expectedSize}`)
+}
+
+async function hashGitObject(type, body) {
+  const enc = new TextEncoder();
+  const header = enc.encode(`${type} ${body.length}\0`);
+
+  const data = new Uint8Array(header.length + body.length);
+  data.set(header, 0);
+  data.set(body, header.length);
+
+  const digest = await crypto.subtle.digest('SHA-1', data);
+  return bytesToHex(new Uint8Array(digest));
 }
 
 /* -----------------------------
@@ -570,36 +690,6 @@ function renderTree() {
   }
 }
 
-const defaultMdRenderer = new marked.Renderer()
-const mdRenderer = new marked.Renderer()
-// override markdown link rendering
-mdRenderer.link = function(obj) {
-  if(!obj.href.match(/^([^/]+):\/\//))
-  {
-    // make a safe escaped link text
-    const escapedText = obj.text || obj.href
-    return `<a href="#${obj.href}" data-md-link="${obj.href}" title="${obj.title || obj.href}">${escapedText}</a>`
-    // TODO: let href be a permalink
-  }
-  return defaultMdRenderer.link.call(this, obj)
-}
-
-function renderMarkdown(container, body) {
-  const html = marked.parse(body, { renderer: mdRenderer })
-  container.innerHTML = html
-
-  // attach click handlers for relative links
-  container.querySelectorAll('a[data-md-link]').forEach(a => {
-    a.addEventListener('click', e => {
-      e.preventDefault()
-      const href = a.getAttribute('data-md-link')
-      const basePath = state.selectedFileEl ? state.selectedFileEl.textContent : ''
-      const resolved = resolveRelativePath(basePath, href)
-      selectFile(resolved)
-    })
-  })
-}
-
 function resolveRelativePath(basePath, relative) {
   if (!relative) return basePath
   if (relative.startsWith('/')) return relative.replace(/^\/+/, '')
@@ -654,8 +744,25 @@ async function selectFile(path) {
   else if (isText(body)) {
     if (path.toLowerCase().endsWith('.md')) {
       // markdown
-      renderMarkdown(container, new TextDecoder().decode(body))
-    } else {
+      container.innerHTML = renderMarkdown(new TextDecoder().decode(body))
+      // attach click handlers for relative links
+      container.querySelectorAll('a[data-md-link]').forEach(a => {
+        a.addEventListener('click', e => {
+          e.preventDefault()
+          const href = a.getAttribute('data-md-link')
+          const basePath = state.selectedFileEl ? state.selectedFileEl.textContent : ''
+          const resolved = resolveRelativePath(basePath, href)
+          selectFile(resolved)
+        })
+      })
+    }
+    else if (path.toLowerCase().endsWith('.pod')) {
+      container.innerHTML = renderPOD(new TextDecoder().decode(body))
+    }
+    else if (path.match(/\.([0-9][a-zA-Z]*)$/)) {
+      container.innerHTML = renderMan(new TextDecoder().decode(body))
+    }
+    else {
       // plain text
       const pre = document.createElement('pre')
       pre.textContent = new TextDecoder().decode(body)
@@ -721,11 +828,7 @@ async function loadPackfiles() {
 }
 
 async function loadRepo(repoUrl) {
-  const prevRepoUrl = state.repoUrl
   state.repoUrl = repoUrl
-  if(prevRepoUrl != repoUrl) {
-    state.autoLoadedRef = true
-  }
   await loadPackfiles()
   await loadRefs()
 }
@@ -758,8 +861,12 @@ function init() {
     reportException(loadRepo, repo)
   }
   $('loadRepoBtn').onclick = () => {
-    const url = $('repoUrl').value.trim()
-    reportException(loadRepo, url)
+    const newRepoUrl = $('repoUrl').value.trim()
+    const prevRepoUrl = state.repoUrl
+    if(prevRepoUrl != newRepoUrl) {
+      state.autoLoadedRef = true
+    }
+    reportException(loadRepo, newRepoUrl)
   }
 }
 
