@@ -1,5 +1,5 @@
 
-import { hexToBytes, bytesToHex, equalBytes, sha1hex } from './gitviewer-util.js'
+import { hexToBytes, bytesToHex, equalBytes, sha1hex, formatDateTime } from './gitviewer-util.js'
 import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
@@ -449,16 +449,42 @@ function parseCommit(body) {
 
   const headers = {}
   for (const line of rawHeaders.split('\n')) {
-    const [k, ...v] = line.split(' ')
-    headers[k] = v.join(' ')
+    const space = line.indexOf(' ')
+    const k = line.slice(0, space)
+    const v = line.slice(space + 1)
+    headers[k] = v
   }
+
+  const author = headers.author
+    ? parseCommitAuthorHeader(headers.author)
+    : null
+  const committer = headers.committer
+    ? parseCommitAuthorHeader(headers.committer)
+    : null
 
   return {
     tree: headers.tree,
     parent: headers.parent,
-    author: headers.author,
-    committer: headers.committer,
+    author,
+    committer,
     message: message || ''
+  }
+}
+
+function parseCommitAuthorHeader(line) {
+  // Match: "Name <email> 1234567890 +0100"
+  const m = line.match(/^(.*)\s+(\d+)\s+([+-]\d+)$/)
+  /* if (!m) throw new Error(`Invalid commit author line: ${line}`) */
+
+  const ident = m[1]
+  const timestamp = Number(m[2])
+  const timezone = m[3]
+
+  return {
+    ident,
+    timestamp,
+    timezone,
+    datetime: new Date(timestamp * 1000)
   }
 }
 
@@ -613,7 +639,14 @@ function updateLoadMoreButton() {
 function renderCommit(oid, commit) {
   const li = document.createElement('li')
   li.setAttribute('data-commithash', oid)
-  li.textContent = `${oid.slice(0, 7)} — ${commit.message.split('\n')[0]}`
+  const span_datetime = document.createElement('span')
+  const span_message_subject = document.createElement('span')
+  span_datetime.classList.add('git-commit-committer-datetime')
+  span_datetime.textContent = formatDateTime(commit.committer.datetime)
+  span_message_subject.classList.add('git-commit-message-subject')
+  span_message_subject.textContent = commit.message.split('\n')[0]
+  li.appendChild(span_datetime)
+  li.appendChild(span_message_subject)
   li.onclick = () => reportException(selectCommit, oid)
   $('commits').appendChild(li)
 }

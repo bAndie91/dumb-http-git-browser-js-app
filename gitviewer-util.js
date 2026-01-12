@@ -52,3 +52,20 @@ export async function sha1hex(data) {
   }
   return sha1Impl(data);
 }
+
+export function formatDateTime(d) {
+  const pad = n => String(n).padStart(2, '0')
+  const Y = d.getFullYear()
+  const M = pad(d.getMonth() + 1)
+  const D = pad(d.getDate())
+  const h = pad(d.getHours())
+  const m = pad(d.getMinutes())
+  const s = pad(d.getSeconds())
+  // compute local timezone offset in ±HHMM
+  const tzOffsetMin = -d.getTimezoneOffset() // JS is opposite sign
+  const sign = tzOffsetMin >= 0 ? '+' : '-'
+  const tzH = pad(Math.floor(Math.abs(tzOffsetMin) / 60))
+  const tzM = pad(Math.abs(tzOffsetMin) % 60)
+  const tz = `${sign}${tzH}${tzM}`
+  return `${Y}-${M}-${D} ${h}:${m}:${s} ${tz}`
+}
