@@ -193,7 +193,7 @@ export function renderPOD(pod) {
                i++;
            }
        }
-       newText = newText.replace(/\b(\w+\([0-9][a-zA-Z]*\))/, '<span class="manpage-reference">$1</span>');
+       newText = newText.replace(/\b([\w\.:-]+\([0-9][a-zA-Z]*\))/g, '<span class="manpage-reference">$1</span>');
        return newText;
    }
    

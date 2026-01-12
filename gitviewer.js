@@ -63,7 +63,7 @@ async function readObjectUnverified(repoUrl, oid) {
   // try packfiles first
   const hit = findInPack(oid)
   if (hit) {
-    return readPackedObject(hit.pack, hit.offset)
+    return readPackedObject(hit.pack, hit.offset, oid)
   }
   
   const dir = oid.slice(0, 2)
@@ -244,7 +244,7 @@ function findInPack(oidHex) {
   return null
 }
 
-async function readPackedObject(pack, offset) {
+async function readPackedObject(pack, offset, self_oid) {
   let i = offset
   let c = pack[i++]
 
@@ -286,7 +286,7 @@ async function readPackedObject(pack, offset) {
   if(!type.match(/DELTA/)) {
     return { type, body: decompressed }
   }
-
+  
   let pos = { pos: 0 };
   const baseSize = readVarInt(decompressed, pos);
   const resultSize = readVarInt(decompressed, pos);
@@ -300,6 +300,7 @@ async function readPackedObject(pack, offset) {
     base = await readObject(state.repoUrl, bytesToHex(baseOid))
   }
   const result = applyDelta(base.body, instructions, resultSize);
+
   return { type: base.type, body: result };
 }
 
