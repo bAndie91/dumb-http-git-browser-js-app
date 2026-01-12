@@ -1,5 +1,5 @@
 
-import { hexToBytes, bytesToHex, equalBytes } from './gitviewer-util.js'
+import { hexToBytes, bytesToHex, equalBytes, sha1hex } from './gitviewer-util.js'
 import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
@@ -94,6 +94,7 @@ async function readObject(repoUrl, oid) {
 }
 
 async function loadPackList(repoUrl) {
+  status('loading pack list')
   const text = await fetchText(`${repoUrl}/objects/info/packs`)
   const packs = []
 
@@ -130,6 +131,7 @@ function readVarInt(buf, posObj) {
 }
 
 async function loadPack(base) {
+  status(`loading pack ${base}`)
   const idxBuf = await fetch(`${state.repoUrl}/objects/pack/${base}.idx`).then(r => r.arrayBuffer())
   const packBuf = await fetch(`${state.repoUrl}/objects/pack/${base}.pack`).then(r => r.arrayBuffer())
   const idx = new Uint8Array(idxBuf)
@@ -216,13 +218,11 @@ async function loadPack(base) {
 
 async function verifyPackChecksum(packBaseName, packBytes) {
   const content = packBytes.subarray(0, packBytes.length - 20);
-  const expected = packBytes.subarray(packBytes.length - 20);
+  const expected_checksum = bytesToHex(packBytes.subarray(packBytes.length - 20));
+  const actual_checksum = await sha1hex(content);
 
-  const digest = await crypto.subtle.digest('SHA-1', content);
-  const actual = new Uint8Array(digest);
-
-  if (!equalBytes(actual, expected)) {
-    throw new Error(`Pack ${packBaseName} calculated checksum ${digest} mismatch stored ${expected} checksum`);
+  if (actual_checksum !== expected_checksum) {
+    throw new Error(`Pack ${packBaseName} calculated checksum ${actual_checksum} mismatch stored ${expected_checksum} checksum.`);
   }
 }
 
@@ -436,8 +436,8 @@ async function hashGitObject(type, body) {
   data.set(header, 0);
   data.set(body, header.length);
 
-  const digest = await crypto.subtle.digest('SHA-1', data);
-  return bytesToHex(new Uint8Array(digest));
+  const digestHex = await sha1hex(data);
+  return digestHex;
 }
 
 /* -----------------------------
