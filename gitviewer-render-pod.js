@@ -110,7 +110,6 @@ export function renderPOD(pod) {
          // if it's a simple-bracket A<...> tag, allow nested single-bracket tags like A<B<...>>
          let innerBracketCount = bracketCount;
          while (endPos <= text.length) {
-         console.log(innerBracketCount, text.slice(endPos))
            if(text[endPos] == '<') { innerBracketCount++; }
            if(text[endPos] == '>') { innerBracketCount--; }
            if(innerBracketCount == 0) { closingStart = endPos; break; }
@@ -184,9 +183,7 @@ export function renderPOD(pod) {
        while (i < text.length) {
            if (codes.indexOf(text[i]) >= 0 && i + 1 < text.length && text[i + 1] === '<') {
                const code = text[i];
-               console.log(code, text, i)
                const rendered = renderPodTag(code, text, i);
-               console.log(code, text, i, rendered.text, rendered.continuePos)
                if(i == rendered.continuePos) { throw new Error(); }
                newText += rendered.text;
                i = rendered.continuePos;
