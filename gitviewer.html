@@ -69,9 +69,28 @@
       z-index: 10;
     }
     
-    .horizontal .splitter {
+    .splitter.vertical {
       width: 6px;
       cursor: col-resize;
+    }
+    
+    .panes.vertical {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    
+    .panes.vertical > .pane {
+      flex: 1;
+      min-height: 50px;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .splitter.horizontal {
+      height: 6px;
+      cursor: row-resize;
+      background: #ccc;
     }
     
     .pane:last-child {
@@ -124,7 +143,7 @@
       background-color: lightgrey;
     }
     .renderPOD em {
-      color: red;
+      color: darkcyan;
     }
     .renderPOD .manpage-reference {
       text-decoration: dotted underline;
@@ -140,7 +159,7 @@
   </header>
 
   <div id="app">
-    <div id="panes" class="panes horizontal">
+    <div id="panes-main" class="panes horizontal">
       <div class="pane">
         <h3>Refs</h3>
         <div class="pane-inner">
@@ -148,16 +167,28 @@
         </div>
       </div>
       
-      <div class="splitter"></div>
+      <div class="splitter vertical"></div>
   
       <div class="pane">
-        <h3>Commits</h3>
-        <div id="commits-loader" class="pane-inner">
-          <ul id="commits" class="dumbgitviewer"></ul>
+        <h3>Log</h3>
+        <div id="panes-column-log" class="panes vertical">
+          <div class="pane">
+            <div id="commits-loader" class="pane-inner">
+              <ul id="commits" class="dumbgitviewer"></ul>
+            </div>
+          </div>
+          
+          <div class="splitter horizontal"></div>
+          
+          <div class="pane">
+            <h3>Commit</h3>
+            <div id="commitDetails" class="pane-inner">
+            </div>
+          </div>
         </div>
       </div>
       
-      <div class="splitter"></div>
+      <div class="splitter vertical"></div>
   
       <div class="pane">
         <h3>Tree</h3>
@@ -166,7 +197,7 @@
         </div>
       </div>
       
-      <div class="splitter"></div>
+      <div class="splitter vertical"></div>
   
       <div class="pane">
         <h3>File</h3>

@@ -1,68 +1,79 @@
 
-const SPLIT_KEY = 'pane-sizes'
-
 function initSplitters(containerId) {
-  const container = document.getElementById(containerId)
-  const panes = [...container.querySelectorAll('.pane')]
-  const splitters = [...container.querySelectorAll('.splitter')]
+  const container = document.getElementById(containerId);
 
-  loadPaneSizes(container, panes)
+  container.querySelectorAll('.splitter').forEach(splitter => {
+    const first = splitter.previousElementSibling;
+    const second = splitter.nextElementSibling;
 
-  splitters.forEach((splitter, i) => {
-    const left = panes[i]
-    const right = panes[i + 1]
+    if (!first || !second) return;
+
+    const parent = splitter.parentElement;
+    const isVertical = parent.classList.contains('vertical');
 
     splitter.addEventListener('mousedown', e => {
-      e.preventDefault()
+      e.preventDefault();
 
-      const startX = e.clientX
-      const leftWidth = left.offsetWidth
-      const rightWidth = right.offsetWidth
+      const start = isVertical ? e.clientY : e.clientX;
+      const firstSize = isVertical ? first.offsetHeight : first.offsetWidth;
+      const secondSize = isVertical ? second.offsetHeight : second.offsetWidth;
 
       function onMove(ev) {
-        const dx = ev.clientX - startX
-        const newLeft = leftWidth + dx
-        const newRight = rightWidth - dx
+        const current = isVertical ? ev.clientY : ev.clientX;
+        const delta = current - start;
 
-        if (newLeft < 80 || newRight < 80) return
+        const newFirst = firstSize + delta;
+        const newSecond = secondSize - delta;
 
-        left.style.flexBasis = `${newLeft}px`
-        right.style.flexBasis = `${newRight}px`
+        if (newFirst < 40 || newSecond < 40) return;
+
+        first.style.flexBasis = `${newFirst}px`;
+        second.style.flexBasis = `${newSecond}px`;
       }
 
       function onUp() {
-        document.removeEventListener('mousemove', onMove)
-        document.removeEventListener('mouseup', onUp)
-        savePaneSizes(container, panes)
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        savePaneSizes(parent);
       }
 
-      document.addEventListener('mousemove', onMove)
-      document.addEventListener('mouseup', onUp)
-    })
-  })
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
 }
 
-function savePaneSizes(container, panes) {
-  const total = container.clientWidth
-  const sizes = panes.map(p => p.offsetWidth / total)
-  localStorage.setItem(SPLIT_KEY, JSON.stringify(sizes))
+function savePaneSizes(panesContainer) {
+  const panes = [...panesContainer.children].filter(el => el.classList.contains('pane'));
+  const isVertical = panesContainer.classList.contains('vertical');
+  const total = isVertical ? panesContainer.clientHeight : panesContainer.clientWidth;
+
+  const sizes = panes.map(p =>
+    (isVertical ? p.offsetHeight : p.offsetWidth) / total
+  );
+
+  const key = 'pane-sizes-' + panesContainer.id;
+  localStorage.setItem(key, JSON.stringify(sizes));
 }
 
-function loadPaneSizes(container, panes) {
-  const raw = localStorage.getItem(SPLIT_KEY)
-  if (!raw) return
+function loadPaneSizes(panesContainer) {
+  const key = 'pane-sizes-' + panesContainer.id;
+  const raw = localStorage.getItem(key);
+  if (!raw) return;
 
-  try {
-    const sizes = JSON.parse(raw)
-    if (sizes.length !== panes.length) return
+  const panes = [...panesContainer.children].filter(el => el.classList.contains('pane'));
+  const sizes = JSON.parse(raw);
 
-    panes.forEach((pane, i) => {
-      pane.style.flexBasis = `${sizes[i] * 100}%`
-    })
-  } catch {}
+  if (sizes.length !== panes.length) return;
+
+  panes.forEach((pane, i) => {
+    pane.style.flexBasis = `${sizes[i] * 100}%`;
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  initSplitters('panes');
+  for (let panesContainer of document.querySelectorAll('.panes[id]')) {
+    loadPaneSizes(panesContainer)
+  }
+  initSplitters('panes-main');
 });
-
