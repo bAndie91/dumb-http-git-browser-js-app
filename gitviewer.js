@@ -1,5 +1,5 @@
 
-import { hexToBytes, bytesToHex, equalBytes, sha1hex, formatDateTime, escapeHtml } from './gitviewer-util.js'
+import { hexToBytes, bytesToHex, equalBytes, sha1hex, formatDateTime, escapeHtml, createMailtoLink, selectElements } from './gitviewer-util.js'
 import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
@@ -455,12 +455,8 @@ function parseCommit(body) {
     headers[k] = v
   }
 
-  const author = headers.author
-    ? parseCommitAuthorHeader(headers.author)
-    : null
-  const committer = headers.committer
-    ? parseCommitAuthorHeader(headers.committer)
-    : null
+  const author = parseCommitAuthorHeader(headers.author || '')
+  const committer = parseCommitAuthorHeader(headers.committer || '')
 
   return {
     headers,
@@ -474,15 +470,18 @@ function parseCommit(body) {
 
 function parseCommitAuthorHeader(line) {
   // Match: "Name <email> 1234567890 +0100"
-  const m = line.match(/^(.*)\s+(\S+?)\s+(\d+)\s+([+-]\d+)$/)
+  const m = line.match(/^((.*)\s+(\S+?))\s+(\d+)\s+([+-]\d+)$/)
   /* if (!m) throw new Error(`Invalid commit author line: ${line}`) */
 
-  const name = m[1]
-  const email = m[2]
-  const timestamp = Number(m[3])
-  const timezone = m[4]
+  const identity = m[1]
+  const name = m[2]
+  const email = m[3]
+  const timestamp = Number(m[4])
+  const timezone = m[5]
 
   return {
+    line,
+    identity,
     name,
     email,
     timestamp,
@@ -590,7 +589,8 @@ async function loadMoreCommits(loadAll) {
     if (obj.type !== 'commit') break
 
     const commit = parseCommit(obj.body)
-    renderCommit(oid, commit)
+    const commitListItem = renderCommit(oid, commit)
+    $('commits').appendChild(commitListItem)
 
     if(oid == state.headOid) {
       selectCommit(oid)
@@ -640,18 +640,15 @@ function updateLoadMoreButton() {
 }
 
 function renderCommit(oid, commit) {
-  const li = document.createElement('li')
-  li.setAttribute('data-commithash', oid)
-  const span_datetime = document.createElement('span')
-  const span_message_subject = document.createElement('span')
-  span_datetime.classList.add('git-commit-committer-datetime')
-  span_datetime.textContent = formatDateTime(commit.committer.datetime)
-  span_message_subject.classList.add('git-commit-message-subject')
-  span_message_subject.textContent = commit.message.split('\n')[0]
-  li.appendChild(span_datetime)
-  li.appendChild(span_message_subject)
-  li.onclick = () => reportException(selectCommit, oid)
-  $('commits').appendChild(li)
+  const tpl = document.getElementById('commit-list-item-template')
+  const node = tpl.content.cloneNode(true)
+
+  selectElements('.commit-list-item', node)
+    .setAttribute('data-commithash', oid)
+    .on('click', () => reportException(selectCommit, oid))
+  selectElements('.commit-datetime', node).textContent = formatDateTime(commit.committer.datetime)
+  selectElements('.commit-message-subject', node).textContent = commit.message.split('\n')[0]
+  return node
 }
 
 async function selectCommit(oid) {
@@ -669,8 +666,7 @@ async function selectCommit(oid) {
   const commit = parseCommit(commitObj.body)
   state.currentCommitOid = oid
 
-  const commitDetails = document.getElementById('commitDetails')
-  commitDetails.innerHTML = renderCommitDetails(commit, oid)
+  updateCommitDetails(commit, oid)
 
   // fetch tree
   const treeObj = await readObject(state.repoUrl, commit.tree)
@@ -687,14 +683,32 @@ async function selectCommit(oid) {
 }
 
 function renderCommitDetails(commit, oid) {
-  let html = `<div class="commit-hash-line"><span class="commit-header">commit</span> <span class="commit-hash">${oid}</span></div>
-  <div class="commit-author-line"><span class="commit-header">Author</span>:
-    <span class="commit-author-name">${escapeHtml(commit.author.name)}</span>
-    <span class="commit-author-email">${escapeHtml(commit.author.email)}</span>
-  </div>
-  <div class="commit-date-line"><span class="commit-header">Date</span>: <span class="commit-date">${formatDateTime(commit.author.datetime)}</span></div>
-  <div class="commit-message">${escapeHtml(commit.message)}</div>`
-  return html
+  const tpl = document.getElementById('commit-details-template')
+  const node = tpl.content.cloneNode(true)
+  
+  selectElements('.commit-hash', node).textContent = oid
+  selectElements('.commit-author-name', node).textContent = commit.author.name
+  selectElements('.commit-author-email', node).forEach((el) => el.appendChild(createMailtoLink(commit.author.email)))
+  selectElements('.commit-author-datetime', node).textContent = formatDateTime(commit.author.datetime)
+  selectElements('.commit-committer-name', node).textContent = commit.committer.name
+  selectElements('.commit-committer-email', node).forEach((el) => el.appendChild(createMailtoLink(commit.committer.email)))
+  selectElements('.commit-commit-datetime', node).textContent = formatDateTime(commit.committer.datetime)
+  selectElements('.commit-message', node).textContent = commit.message
+  
+  selectElements(commit.author.identity === commit.committer.identity 
+    ? '.commit-author-differ-committer'
+    : '.commit-author-equal-committer', node).style.display = 'none'
+  selectElements(commit.author.timestamp === commit.committer.timestamp 
+    ? '.commit-author-date-differ-committer-date'
+    : '.commit-author-date-equal-committer-date', node).style.display = 'none'
+
+  return node
+}
+
+function updateCommitDetails(commit, oid) {
+  const container = document.getElementById('commitDetails')
+  container.innerHTML = ''
+  container.appendChild(renderCommitDetails(commit, oid))
 }
 
 function parseTree(body) {

@@ -75,3 +75,73 @@ export function escapeHtml(text) {
              .replace(/</g, '&lt;')
              .replace(/>/g, '&gt;');
 }
+
+export function createMailtoLink(email) {
+  const anchor = document.createElement('A')
+  anchor.href = 'mailto:' + email
+  anchor.textContent = email
+  return anchor
+}
+
+export function selectElements(selector, root = document) {
+  const nodes = Array.from(root.querySelectorAll(selector))
+
+  let proxy = new Proxy({}, {
+    get(_, prop) {
+      // allow access to raw nodes if needed
+      if (prop === 'nodes') return nodes
+      if (prop === 'length') return nodes.length
+
+      // custom helpers
+      if (prop === 'on') {
+        return (event, handler) => {
+          for (const el of nodes) {
+            el.addEventListener(event, handler)
+          }
+          return proxy
+        }
+      }
+      
+      if (prop === 'forEach') {
+        return (callback) => {
+          for (const el of nodes) {
+            callback(el)
+          }
+          return proxy
+        }
+      }
+      
+      // chainable text content setter
+      if (prop === 'text') {
+        return (txt) => {
+          for (const el of nodes) el.textContent = txt
+          return proxy
+        }
+      }
+      
+      // method fan-out for DOM methods
+      if (prop in nodes[0] && typeof nodes[0][prop] === 'function') {
+        return (...args) => {
+          for (const el of nodes) {
+            el[prop](...args)
+          }
+          return proxy
+        }
+      }
+      
+      // property read returns first element's value
+      if (nodes.length > 0) return nodes[0][prop]
+
+      return undefined
+    },
+
+    set(_, prop, value) {
+      for (const el of nodes) {
+        el[prop] = value
+      }
+      return true
+    }
+  })
+  
+  return proxy
+}

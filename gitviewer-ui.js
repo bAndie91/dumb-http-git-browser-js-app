@@ -1,4 +1,6 @@
 
+/* resizable panes */
+
 function initSplitters(containerId) {
   const container = document.getElementById(containerId);
 
@@ -71,9 +73,43 @@ function loadPaneSizes(panesContainer) {
   });
 }
 
+/* commit log message view modes */
+
+function setCommitLogMessageViewMode(modeSwitcherContainer, mode, commitLogContainer) {
+  const buttons = modeSwitcherContainer.querySelectorAll('button');
+  // Update button states
+  buttons.forEach(btn => {
+    const isActive = btn.dataset.mode === mode;
+    btn.setAttribute('aria-checked', isActive);
+  });
+  // Update message styles
+  commitLogContainer.classList.remove('ellipsize-items')
+  commitLogContainer.classList.remove('hscroll-items')
+  commitLogContainer.classList.remove('wrap-items')
+  commitLogContainer.classList.add(`${mode}-items`)
+}
+
+function initCommitLogMessageViewModeSwitcher(modeSwitcherContainer, commitLogContainer) {
+  // Add click handlers to buttons
+  const buttons = modeSwitcherContainer.querySelectorAll('button');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      localStorage.setItem('commitLogMessageViewMode', btn.dataset.mode);
+      setCommitLogMessageViewMode(modeSwitcherContainer, btn.dataset.mode, commitLogContainer);
+    });
+  });
+}
+
+/* init */
+
 document.addEventListener("DOMContentLoaded", () => {
   for (let panesContainer of document.querySelectorAll('.panes[id]')) {
     loadPaneSizes(panesContainer)
   }
   initSplitters('panes-main');
+  
+  const commitLogMessageViewModeSwitcherContainer = document.querySelector('.commitlog-message-view-mode-switcher');
+  const commitLogContainer = document.getElementById('commits');
+  initCommitLogMessageViewModeSwitcher(commitLogMessageViewModeSwitcherContainer, commitLogContainer);
+  setCommitLogMessageViewMode(commitLogMessageViewModeSwitcherContainer, localStorage.getItem('commitLogMessageViewMode') || 'ellipsize', commitLogContainer);
 });

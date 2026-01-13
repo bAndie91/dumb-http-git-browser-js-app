@@ -57,10 +57,14 @@
       position: sticky;
       top: 0;
       z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
     
     .pane-inner {
       overflow: auto;
+      height: 100%;
       padding: 0 0.5em;
     }
     
@@ -131,17 +135,70 @@
       margin-left: -3px;
     }
     
-    .git-commit-committer-datetime {
+    .commitlog-message-view-mode-switcher {
+      display: flex;
+      gap: 2px;
+      background: #ddd;
+      border-radius: 4px;
+      padding: 2px;
+    }
+
+    .commitlog-message-view-mode-switcher button {
+      background: transparent;
+      border: none;
+      padding: 1px 5px;
+      font-size: 14px;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background-color 0.15s ease;
+      color: #666;
+    }
+
+    .commitlog-message-view-mode-switcher button:hover {
+      background: #ccc;
+      color: #333;
+    }
+
+    .commitlog-message-view-mode-switcher button[aria-checked="true"] {
+      background: #fff;
+      color: #000;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    
+    ul#commits.hscroll-items {
+      width: max-content;
+    }
+    #commits.ellipsize-items .commit-list-item .commit-message-subject {
+      overflow: hidden;          /* required for ellipsis */
+      text-overflow: ellipsis;   /* show "…" when clipped */
+      white-space: nowrap;       /* prevent wrapping */
+    }
+    #commits.hscroll-items .commit-list-item .commit-message-subject {
+      white-space: nowrap;       /* prevent wrapping */
+    }
+    #commits.wrap-items .commit-list-item .commit-message-subject {
+      white-space: normal;
+      word-wrap: break-word;
+    }
+    #commits.ellipsize-items .commit-list-item,
+    #commits.hscroll-items .commit-list-item {
+      display: flex;
+    }
+    #commits.wrap-items .commit-list-item {
+      display: block;
+    }
+    
+    .commit-datetime {
       color: #888;           /* subtle gray */
       font-size: 0.85em;     /* slightly smaller */
       white-space: nowrap;    /* never wrap */
+    }
+    .commit-list-item .commit-datetime {
       margin-right: 10px;     /* spacing before message */
     }
-    .git-commit-message-subject {
+    .commit-list-item .commit-message-subject {
       color: #222;           /* primary color */
       font-weight: 500;
-      overflow-wrap: anywhere; /* wrap long messages nicely */
-      flex: 1;               /* take remaining space */
     }
     
     #commits-loader button {
@@ -151,18 +208,19 @@
     #commitDetails .commit-hash {
       font-family: monospace;
     }
-    #commitDetails .commit-author-email {
-      color: blue;
-    }
     #commitDetails .commit-header {
       font-weight: bold;
     }
     #commitDetails .commit-message {
       margin-top: 0.75em;
     }
-    
-    .file-content-placeholder {
-      background-color: grey;
+    #commitDetails .commit-aligned-header-lines {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      column-gap: 0.5em;
+    }
+    #commitDetails .commit-aligned-header-lines > .commit-header-line {
+      display: contents;
     }
     
     .renderPOD .pod-command-unknown {
@@ -194,13 +252,20 @@
       </div>
       
       <div class="splitter vertical"></div>
-  
+      
       <div class="pane">
-        <h3>Log</h3>
+        <h3>Log
+          <div class="commitlog-message-view-mode-switcher" role="radiogroup" aria-label="Commit message display mode">
+            <button role="radio" aria-checked="true" data-mode="ellipsize" title="Ellipsize long messages">…</button>
+            <button role="radio" aria-checked="false" data-mode="hscroll" title="Scroll long messages">⇄</button>
+            <button role="radio" aria-checked="false" data-mode="wrap" title="Wrap long messages">↵</button>
+          </div>
+        </h3>
+        
         <div id="panes-column-log" class="panes vertical">
           <div class="pane">
             <div id="commits-loader" class="pane-inner">
-              <ul id="commits" class="dumbgitviewer"></ul>
+              <ul id="commits" class="dumbgitviewer ellipsize-items"></ul>
             </div>
           </div>
           
@@ -236,5 +301,68 @@
 
   <script type="module" src="./gitviewer-ui.js"></script>
   <script type="module" src="./gitviewer.js"></script>
+
+  <template id="commit-list-item-template">
+    <li class="commit-list-item">
+    	<span class="commit-datetime"></span>
+    	<span class="commit-message-subject"></span>
+    </li>
+  </template>
+
+  <template id="commit-details-template">
+    <div class="commit-header-line commit-hash-line">
+      <span class="commit-header">commit</span>
+      <span class="commit-hash"></span>
+    </div>
+    
+    <div class="commit-author-equal-committer">
+      <div class="commit-header-line commit-author-line">
+        <span class="commit-header">Author:</span>
+        <span class="commit-author-identity">
+          <span class="commit-author-name"></span>
+          <span class="commit-author-email"></span>
+        </span>
+      </div>
+    </div>
+    
+    <div class="commit-author-differ-committer commit-aligned-header-lines">
+      <div class="commit-header-line commit-author-line">
+        <span class="commit-header">Author:</span>
+        <span class="commit-author-identity">
+          <span class="commit-author-name"></span>
+          <span class="commit-author-email"></span>
+        </span>
+      </div>
+      
+      <div class="commit-header-line commit-committer-line">
+        <span class="commit-header">Committer:</span>
+        <span class="commit-committer-identity">
+          <span class="commit-committer-name"></span>
+          <span class="commit-committer-email"></span>
+        </span>
+      </div>
+    </div>
+    
+    <div class="commit-author-date-equal-committer-date">
+      <div class="commit-header-line commit-date-line commit-author-date-line">
+        <span class="commit-header">Date:</span>
+        <span class="commit-author-datetime commit-datetime"></span>
+      </div>
+    </div>
+    
+    <div class="commit-author-date-differ-committer-date commit-aligned-header-lines">
+      <div class="commit-header-line commit-date-line commit-author-date-line">
+        <span class="commit-header">Authored Date:</span>
+        <span class="commit-author-datetime commit-datetime"></span>
+      </div>
+    
+      <div class="commit-header-line commit-date-line commit-commit-date-line">
+        <span class="commit-header">Commit Date:</span>
+        <span class="commit-commit-datetime commit-datetime"></span>
+      </div>
+    </div>
+  
+    <div class="commit-message"></div>
+  </template>
 </body>
 </html>
