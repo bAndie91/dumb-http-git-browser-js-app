@@ -1,3 +1,6 @@
+
+import { escapeHtml } from './gitviewer-util.js';
+
 export function renderPOD(pod) {
    const lines = pod.split('\n');
    const html = [];
@@ -8,12 +11,6 @@ export function renderPOD(pod) {
 
    function getCurrentList() {
        return listStack.length > 0 ? listStack[listStack.length - 1] : null;
-   }
-
-   function escapeHtml(text) {
-       return text.replace(/&/g, '&amp;')
-                  .replace(/</g, '&lt;')
-                  .replace(/>/g, '&gt;');
    }
 
    function flushVerbatim() {

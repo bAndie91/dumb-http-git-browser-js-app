@@ -1,5 +1,5 @@
 
-import { hexToBytes, bytesToHex, equalBytes, sha1hex, formatDateTime } from './gitviewer-util.js'
+import { hexToBytes, bytesToHex, equalBytes, sha1hex, formatDateTime, escapeHtml } from './gitviewer-util.js'
 import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
@@ -463,6 +463,7 @@ function parseCommit(body) {
     : null
 
   return {
+    headers,
     tree: headers.tree,
     parent: headers.parent,
     author,
@@ -473,15 +474,17 @@ function parseCommit(body) {
 
 function parseCommitAuthorHeader(line) {
   // Match: "Name <email> 1234567890 +0100"
-  const m = line.match(/^(.*)\s+(\d+)\s+([+-]\d+)$/)
+  const m = line.match(/^(.*)\s+(\S+?)\s+(\d+)\s+([+-]\d+)$/)
   /* if (!m) throw new Error(`Invalid commit author line: ${line}`) */
 
-  const ident = m[1]
-  const timestamp = Number(m[2])
-  const timezone = m[3]
+  const name = m[1]
+  const email = m[2]
+  const timestamp = Number(m[3])
+  const timezone = m[4]
 
   return {
-    ident,
+    name,
+    email,
     timestamp,
     timezone,
     datetime: new Date(timestamp * 1000)
@@ -660,12 +663,14 @@ async function selectCommit(oid) {
   status('Loading commit…')
   const commitObj = await readObject(state.repoUrl, oid)
   if (commitObj.type !== 'commit') {
-    status('Not a commit object')
-    return
+    throw new Error(`Not a commit object: ${oid}`)
   }
 
   const commit = parseCommit(commitObj.body)
   state.currentCommitOid = oid
+
+  const commitDetails = document.getElementById('commitDetails')
+  commitDetails.innerHTML = renderCommitDetails(commit, oid)
 
   // fetch tree
   const treeObj = await readObject(state.repoUrl, commit.tree)
@@ -679,6 +684,17 @@ async function selectCommit(oid) {
   // render tree pane
   renderTree()
   status('')
+}
+
+function renderCommitDetails(commit, oid) {
+  let html = `<div class="commit-hash-line"><span class="commit-header">commit</span> <span class="commit-hash">${oid}</span></div>
+  <div class="commit-author-line"><span class="commit-header">Author</span>:
+    <span class="commit-author-name">${escapeHtml(commit.author.name)}</span>
+    <span class="commit-author-email">${escapeHtml(commit.author.email)}</span>
+  </div>
+  <div class="commit-date-line"><span class="commit-header">Date</span>: <span class="commit-date">${formatDateTime(commit.author.datetime)}</span></div>
+  <div class="commit-message">${escapeHtml(commit.message)}</div>`
+  return html
 }
 
 function parseTree(body) {

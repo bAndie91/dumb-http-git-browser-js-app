@@ -69,3 +69,9 @@ export function formatDateTime(d) {
   const tz = `${sign}${tzH}${tzM}`
   return `${Y}-${M}-${D} ${h}:${m}:${s} ${tz}`
 }
+
+export function escapeHtml(text) {
+  return text.replace(/&/g, '&amp;')
+             .replace(/</g, '&lt;')
+             .replace(/>/g, '&gt;');
+}
