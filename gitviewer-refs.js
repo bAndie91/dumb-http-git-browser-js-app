@@ -1,5 +1,6 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { $, status, clear, state, reportException, fetchText } from './gitviewer-common.js'
+import { loadMoreCommits } from './gitviewer-commitlog.js'
 
 export async function loadRefs() {
   clear($('refs'))

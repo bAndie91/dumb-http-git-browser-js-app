@@ -1,9 +1,7 @@
 
-import { hexToBytes, bytesToHex, equalBytes, sha1hex, formatDateTime, escapeHtml, createMailtoLink, selectElements } from './gitviewer-util.js'
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
 import { loadPackfiles } from './gitviewer-pack.js'
 import { loadRefs } from './gitviewer-refs.js'
-import { selectFile } from './gitviewer-file.js'
 
 
 

@@ -1,20 +1,10 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { $, status, clear, state, reportException, fetchBinary } from './gitviewer-common.js'
+import { hexToBytes, equalBytes, sha1hex } from './gitviewer-util.js'
+import { readPackedObject } from './gitviewer-pack.js'
 
 const objectCache = new Map(); // key: oidHex OR packOffset
 
-
-async function fetchText(url) {
-  const r = await fetch(url)
-  if (!r.ok) throw new Error(`${r.status} ${url}`)
-  return r.text()
-}
-
-async function fetchBinary(url) {
-  const r = await fetch(url)
-  if (!r.ok) throw new Error(`${r.status} ${url}`)
-  return new Uint8Array(await r.arrayBuffer())
-}
 
 async function fetchLooseGitObject(url) {
   try {
@@ -53,7 +43,7 @@ async function readObjectUnverified(repoUrl, oid) {
   throw new Error(`Object ${oid} found neither in packfiles nor as loose object`)
 }
 
-async function readObject(repoUrl, oid) {
+export async function readObject(repoUrl, oid) {
   const obj = await readObjectUnverified(repoUrl, oid)
   const verifyChecksum = await hashGitObject(obj.type, obj.body);
   if (verifyChecksum !== oid) {
@@ -72,4 +62,22 @@ async function hashGitObject(type, body) {
 
   const digestHex = await sha1hex(data);
   return digestHex;
+}
+
+function findInPack(oidHex) {
+  const oid = hexToBytes(oidHex)
+
+  for (const p of state.packfiles) {
+    const first = oid[0]
+    const lo = first === 0 ? 0 : p.fanout[first - 1]
+    const hi = p.fanout[first]
+
+    for (let i = lo; i < hi; i++) {
+      const o = p.oids.slice(i * 20, i * 20 + 20)
+      if (equalBytes(o, oid)) {
+        return { pack: p.pack, offset: p.offsets[i], }
+      }
+    }
+  }
+  return null
 }

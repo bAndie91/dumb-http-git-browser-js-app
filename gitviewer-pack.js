@@ -1,8 +1,10 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { readUint32BE, readVarInt } from './gitviewer-util.js';
+import { $, status, clear, state, reportException, fetchText } from './gitviewer-common.js'
+import { readUint32BE, readVarInt, bytesToHex, hexToBytes, sha1hex } from './gitviewer-util.js';
+import { readObject } from './gitviewer-object.js'
 
 const debug_pack_decompress = false
+
 
 export async function loadPackfiles() {
     state.packfiles = []
@@ -122,25 +124,7 @@ async function verifyPackChecksum(packBaseName, packBytes) {
   }
 }
 
-function findInPack(oidHex) {
-  const oid = hexToBytes(oidHex)
-
-  for (const p of state.packfiles) {
-    const first = oid[0]
-    const lo = first === 0 ? 0 : p.fanout[first - 1]
-    const hi = p.fanout[first]
-
-    for (let i = lo; i < hi; i++) {
-      const o = p.oids.slice(i * 20, i * 20 + 20)
-      if (equalBytes(o, oid)) {
-        return { pack: p.pack, offset: p.offsets[i], }
-      }
-    }
-  }
-  return null
-}
-
-async function readPackedObject(pack, offset, self_oid) {
+export async function readPackedObject(pack, offset, self_oid) {
   let i = offset
   let c = pack[i++]
 

@@ -1,7 +1,10 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { selectElements, formatDateTime, createMailtoLink } from './gitviewer-util.js'
+import { readObject } from './gitviewer-object.js'
+import { parseTree, renderTree } from './gitviewer-tree.js'
 
-function parseCommit(body) {
+export function parseCommit(body) {
   const text = new TextDecoder().decode(body)
   const [rawHeaders, message] = text.split('\n\n', 2)
 
@@ -48,7 +51,7 @@ function parseCommitAuthorHeader(line) {
   }
 }
 
-async function selectCommit(oid) {
+export async function selectCommit(oid) {
   if (state.selectedCommitEl) state.selectedCommitEl.classList.remove('selected')
   const el = document.querySelector(`[data-commithash="${oid}"]`)
   state.selectedCommitEl = el

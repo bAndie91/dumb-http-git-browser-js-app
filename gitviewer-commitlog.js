@@ -1,12 +1,15 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { selectElements, formatDateTime } from './gitviewer-util.js'
+import { parseCommit, selectCommit } from './gitviewer-commit.js'
+import { readObject } from './gitviewer-object.js'
 
 var COMMITS_PER_PAGE = 5
 
 /* -----------------------------
    Commit log (paged)
 ----------------------------- */
-async function loadMoreCommits(loadAll) {
+export async function loadMoreCommits(loadAll) {
   status('Loading commits…')
 
   let count = 0

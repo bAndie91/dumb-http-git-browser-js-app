@@ -30,3 +30,15 @@ export async function reportException(func, ...args) {
     throw e
   }
 }
+
+export async function fetchText(url) {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`${r.status} ${url}`)
+  return r.text()
+}
+
+export async function fetchBinary(url) {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error(`${r.status} ${url}`)
+  return new Uint8Array(await r.arrayBuffer())
+}

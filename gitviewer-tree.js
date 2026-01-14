@@ -1,7 +1,8 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { selectFile } from './gitviewer-file.js'
 
-function parseTree(body) {
+export function parseTree(body) {
   const entries = []
   let i = 0
   while (i < body.length) {
@@ -29,7 +30,7 @@ function parseTree(body) {
   return entries
 }
 
-function renderTree() {
+export function renderTree() {
   const container = $('tree')
   clear(container)
 

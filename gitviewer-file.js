@@ -1,5 +1,6 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { readObject } from './gitviewer-object.js'
 
 import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'

@@ -12,10 +12,10 @@ function slugify(text) {
 }
 
 function isAbsoluteLink(link) {
-  return obj.href.match(/^([^/]+):\/\//)
+  return link.match(/^([^/]+):\/\//)
 }
 function isFragmentLink(link) {
-  return obj.href.match(/^#/)
+  return link.match(/^#/)
 }
 
 // override markdown link rendering
