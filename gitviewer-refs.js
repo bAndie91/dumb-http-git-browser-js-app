@@ -1,0 +1,79 @@
+
+import { $, status, clear, state, reportException } from './gitviewer-common.js'
+
+export async function loadRefs() {
+  clear($('refs'))
+  status('Loading refs…')
+
+  const refs = await listRefs(state.repoUrl)
+
+  for (const ref of refs) {
+    const li = document.createElement('li')
+    li.setAttribute('data-ref', ref)
+    li.textContent = ref.replace(/^refs\//, '')
+    li.onclick = () => reportException(selectRef, ref)
+    $('refs').appendChild(li)
+  }
+
+  status('')
+  
+  // auto-select ref from URL
+  var autoloadRef = new URLSearchParams(location.search).get('ref')
+  if (autoloadRef) {
+    autoloadRef = 'refs/'+autoloadRef
+  }
+  if (!autoloadRef || state.autoLoadedRef) {
+    await selectRef(state.headRef)
+  }
+  if(autoloadRef && refs.includes(autoloadRef) && !state.autoLoadedRef) {
+    await selectRef(autoloadRef)
+    state.autoLoadedRef = true
+  }
+}
+
+async function listRefs(repoUrl) {
+  const refs = []
+
+  // HEAD
+  const head = (await fetchText(`${repoUrl}/HEAD`)).trim()
+  var head_ref
+  if (head.startsWith('ref: ')) {
+    head_ref = head.slice(5)
+    state.headRef = head_ref
+    refs.push(head_ref)
+  }
+
+  // refs
+  const info_refs = (await fetchText(`${repoUrl}/info/refs`)).trim().split('\n')
+  for (const info_ref of info_refs) {
+    var ref = info_ref.slice(41)
+    if(ref != head_ref) {
+      refs.push(ref)
+    }
+  }
+
+  return refs
+}
+
+/* -----------------------------
+   Select ref → resolve OID
+----------------------------- */
+async function selectRef(ref) {
+  state.ref = ref
+  
+  if (state.selectedRefEl) state.selectedRefEl.classList.remove('selected')
+  const el = document.querySelector(`[data-ref="${ref}"]`)
+  state.selectedRefEl = el
+  el.classList.add('selected')
+  
+  clear($('commits'))
+  status(`Resolving ${ref}…`)
+
+  const oid = (await fetchText(`${state.repoUrl}/${ref}`)).trim()
+  state.headOid = oid
+  state.commitQueue = [oid]
+  state.loadedCommits = 0
+  state.reachedRoot = false
+
+  await loadMoreCommits()
+}

@@ -1,3 +1,4 @@
+
 export function hexToBytes(hex) {
   const a = new Uint8Array(20)
   for (let i = 0; i < 20; i++)
@@ -7,6 +8,29 @@ export function hexToBytes(hex) {
 
 export function bytesToHex(bytes) {
   return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function readUint32BE(buf, off) {
+  return (
+    (buf[off] << 24) |
+    (buf[off + 1] << 16) |
+    (buf[off + 2] << 8) |
+    buf[off + 3]
+  ) >>> 0
+}
+
+export function readVarInt(buf, posObj) {
+  let result = 0;
+  let shift = 0;
+  let byte;
+
+  do {
+    byte = buf[posObj.pos++];
+    result |= (byte & 0x7f) << shift;
+    shift += 7;
+  } while (byte & 0x80);
+
+  return result;
 }
 
 export function equalBytes(a, b) {

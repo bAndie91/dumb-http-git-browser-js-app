@@ -11,9 +11,16 @@ function slugify(text) {
         .trim();
 }
 
+function isAbsoluteLink(link) {
+  return obj.href.match(/^([^/]+):\/\//)
+}
+function isFragmentLink(link) {
+  return obj.href.match(/^#/)
+}
+
 // override markdown link rendering
 mdRenderer.link = function(obj) {
-  if(!obj.href.match(/^([^/]+):\/\//))
+  if(!isAbsoluteLink(obj.href) && !isFragmentLink(obj.href))
   {
     // make a safe escaped link text
     const escapedText = obj.text || obj.href
@@ -21,6 +28,13 @@ mdRenderer.link = function(obj) {
     // TODO: let href be a permalink
   }
   return defaultMdRenderer.link.call(this, obj)
+}
+
+mdRenderer.image = function(obj) {
+  if(!isAbsoluteLink(obj.href)) {
+    obj.href = null // TODO image source points into the repo, make a "data:" URL
+  }
+  return defaultMdRenderer.image.call(this, obj)
 }
 
 let toc = [];
