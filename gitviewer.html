@@ -135,7 +135,9 @@
       margin-left: -3px;
     }
     
-    .commitlog-message-view-mode-switcher {
+    /* the long lines display mode switcher(s) */
+    
+    .long-lines-display-mode-switcher {
       display: flex;
       gap: 2px;
       background: #ddd;
@@ -143,7 +145,7 @@
       padding: 2px;
     }
 
-    .commitlog-message-view-mode-switcher button {
+    .long-lines-display-mode-switcher button {
       background: transparent;
       border: none;
       padding: 1px 5px;
@@ -154,39 +156,41 @@
       color: #666;
     }
 
-    .commitlog-message-view-mode-switcher button:hover {
+    .long-lines-display-mode-switcher button:hover {
       background: #ccc;
       color: #333;
     }
 
-    .commitlog-message-view-mode-switcher button[aria-checked="true"] {
+    .long-lines-display-mode-switcher button[aria-checked="true"] {
       background: #fff;
       color: #000;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
-    ul#commits.hscroll-items {
+    .pane-inner.hscroll-long-lines ul {
       width: max-content;
     }
-    #commits.ellipsize-items .commit-list-item .commit-message-subject {
+    .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject {
       overflow: hidden;          /* required for ellipsis */
       text-overflow: ellipsis;   /* show "…" when clipped */
       white-space: nowrap;       /* prevent wrapping */
     }
-    #commits.hscroll-items .commit-list-item .commit-message-subject {
+    .pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject {
       white-space: nowrap;       /* prevent wrapping */
     }
-    #commits.wrap-items .commit-list-item .commit-message-subject {
+    .pane-inner.wrap-long-lines .commit-list-item .commit-message-subject {
       white-space: normal;
       word-wrap: break-word;
     }
-    #commits.ellipsize-items .commit-list-item,
-    #commits.hscroll-items .commit-list-item {
+    .pane-inner.ellipsize-long-lines .commit-list-item,
+    .pane-inner.hscroll-long-lines .commit-list-item {
       display: flex;
     }
-    #commits.wrap-items .commit-list-item {
+    .pane-inner.wrap-long-lines .commit-list-item {
       display: block;
     }
+    
+    /* */
     
     .commit-datetime {
       color: #888;           /* subtle gray */
@@ -245,7 +249,7 @@
 
   <div id="app">
     <div id="panes-main" class="panes horizontal">
-      <div class="pane">
+      <div id="pane-refs" class="pane">
         <h3>Refs</h3>
         <div class="pane-inner">
           <ul id="refs" class="dumbgitviewer"></ul>
@@ -255,24 +259,18 @@
       <div class="splitter vertical"></div>
       
       <div class="pane">
-        <h3>Log
-          <div class="commitlog-message-view-mode-switcher" role="radiogroup" aria-label="Commit message display mode">
-            <button role="radio" aria-checked="true" data-mode="ellipsize" title="Ellipsize long messages">…</button>
-            <button role="radio" aria-checked="false" data-mode="hscroll" title="Scroll long messages">⇄</button>
-            <button role="radio" aria-checked="false" data-mode="wrap" title="Wrap long messages">↵</button>
-          </div>
-        </h3>
         
         <div id="panes-column-log" class="panes vertical">
-          <div class="pane">
+          <div id="pane-log" class="pane">
+            <h3>Log</h3>
             <div id="commits-loader" class="pane-inner">
-              <ul id="commits" class="dumbgitviewer ellipsize-items"></ul>
+              <ul id="commits" class="dumbgitviewer hscroll-long-lines"></ul>
             </div>
           </div>
           
           <div class="splitter horizontal"></div>
           
-          <div class="pane">
+          <div id="pane-commit" class="pane">
             <h3>Commit</h3>
             <div id="commitDetails" class="pane-inner">
             </div>
@@ -282,7 +280,7 @@
       
       <div class="splitter vertical"></div>
   
-      <div class="pane">
+      <div id="pane-tree" class="pane">
         <h3>Tree</h3>
         <div class="pane-inner">
           <ul id="tree" class="dumbgitviewer"></ul>
@@ -291,7 +289,7 @@
       
       <div class="splitter vertical"></div>
   
-      <div class="pane">
+      <div id="pane-file" class="pane">
         <h3>File</h3>
         <div class="pane-inner">
           <div id="file"></div>
@@ -303,6 +301,14 @@
   <script type="module" src="./gitviewer-ui.js"></script>
   <script type="module" src="./gitviewer.js"></script>
 
+  <template id="long-lines-display-mode-switcher">
+     <div class="long-lines-display-mode-switcher" role="radiogroup" aria-label="Text display mode">
+       <button role="radio" aria-checked="false" data-mode="ellipsize" title="Ellipsize long lines">…</button>
+       <button role="radio" aria-checked="true" data-mode="hscroll" title="Scroll long lines">⇄</button>
+       <button role="radio" aria-checked="false" data-mode="wrap" title="Wrap long lines">↵</button>
+     </div>
+  </template>
+  
   <template id="commit-list-item-template">
     <li class="commit-list-item">
     	<span class="commit-datetime"></span>

@@ -75,7 +75,7 @@ function loadPaneSizes(panesContainer) {
 
 /* commit log message view modes */
 
-function setCommitLogMessageViewMode(modeSwitcherContainer, mode, commitLogContainer) {
+function setLongLinesDisplayMode(modeSwitcherContainer, mode, targetContainer) {
   const buttons = modeSwitcherContainer.querySelectorAll('button');
   // Update button states
   buttons.forEach(btn => {
@@ -83,19 +83,19 @@ function setCommitLogMessageViewMode(modeSwitcherContainer, mode, commitLogConta
     btn.setAttribute('aria-checked', isActive);
   });
   // Update message styles
-  commitLogContainer.classList.remove('ellipsize-items')
-  commitLogContainer.classList.remove('hscroll-items')
-  commitLogContainer.classList.remove('wrap-items')
-  commitLogContainer.classList.add(`${mode}-items`)
+  targetContainer.classList.remove('ellipsize-long-lines')
+  targetContainer.classList.remove('hscroll-long-lines')
+  targetContainer.classList.remove('wrap-long-lines')
+  targetContainer.classList.add(`${mode}-long-lines`)
 }
 
-function initCommitLogMessageViewModeSwitcher(modeSwitcherContainer, commitLogContainer) {
+function initLongLinesDisplayModeSwitcherContainer(modeSwitcherContainer, pane_name, targetContainer) {
   // Add click handlers to buttons
   const buttons = modeSwitcherContainer.querySelectorAll('button');
   buttons.forEach(btn => {
     btn.addEventListener('click', () => {
-      localStorage.setItem('commitLogMessageViewMode', btn.dataset.mode);
-      setCommitLogMessageViewMode(modeSwitcherContainer, btn.dataset.mode, commitLogContainer);
+      localStorage.setItem(`longLinesDisplayMode-${pane_name}`, btn.dataset.mode);
+      setLongLinesDisplayMode(modeSwitcherContainer, btn.dataset.mode, targetContainer);
     });
   });
 }
@@ -108,8 +108,15 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   initSplitters('panes-main');
   
-  const commitLogMessageViewModeSwitcherContainer = document.querySelector('.commitlog-message-view-mode-switcher');
-  const commitLogContainer = document.getElementById('commits');
-  initCommitLogMessageViewModeSwitcher(commitLogMessageViewModeSwitcherContainer, commitLogContainer);
-  setCommitLogMessageViewMode(commitLogMessageViewModeSwitcherContainer, localStorage.getItem('commitLogMessageViewMode') || 'ellipsize', commitLogContainer);
+  for(const pane_name of ['refs', 'log', 'commit', 'tree', 'file']) {
+    const pane = document.getElementById(`pane-${pane_name}`)
+    const pane_head = pane.querySelector('h3')
+    const targetContainer = pane.querySelector('.pane-inner')
+    const tpl = document.getElementById('long-lines-display-mode-switcher')
+    pane_head.appendChild(tpl.content.cloneNode(true))
+    
+    const longLinesDisplayModeSwitcherContainer = pane_head.querySelector('.long-lines-display-mode-switcher')
+    initLongLinesDisplayModeSwitcherContainer(longLinesDisplayModeSwitcherContainer, pane_name, targetContainer);
+    setLongLinesDisplayMode(longLinesDisplayModeSwitcherContainer, localStorage.getItem(`longLinesDisplayMode-${pane_name}`) || 'hscroll', targetContainer);
+  }
 });
