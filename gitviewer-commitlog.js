@@ -78,6 +78,6 @@ function renderCommit(oid, commit) {
     .setAttribute('data-commithash', oid)
     .on('click', () => reportException(selectCommit, oid))
   selectElements('.commit-datetime', node).textContent = formatDateTime(commit.committer.datetime)
-  selectElements('.commit-message-subject', node).textContent = commit.message.split('\n')[0]
+  selectElements('.commit-message-subject', node).textContent = commit.message.split('\n', 1)[0]
   return node
 }

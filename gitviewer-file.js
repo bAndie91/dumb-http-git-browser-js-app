@@ -104,12 +104,12 @@ function isText(uint8arr) {
 }
 
 function isImage(uint8arr, filename) {
-  const ext = filename.split('.').pop().toLowerCase()
+  const ext = filename.split('.', 1)[0].toLowerCase()
   return ['png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext)
 }
 
 function mimeTypeFromFilename(filename) {
-  const ext = filename.split('.').pop().toLowerCase()
+  const ext = filename.split('.', 1)[0].toLowerCase()
   switch (ext) {
     case 'png': return 'image/png'
     case 'jpg': case 'jpeg': return 'image/jpeg'

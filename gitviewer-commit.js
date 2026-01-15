@@ -6,7 +6,9 @@ import { parseTree, renderTree } from './gitviewer-tree.js'
 
 export function parseCommit(body) {
   const text = new TextDecoder().decode(body)
-  const [rawHeaders, message] = text.split('\n\n', 2)
+  const sections = text.split('\n\n')
+  const rawHeaders = sections[0]
+  const message = sections.slice(1).join('\n\n')
 
   const headers = {}
   for (const line of rawHeaders.split('\n')) {

@@ -109,7 +109,8 @@
 
     .dumbgitviewer li {
       cursor: pointer;
-      padding: 2px 4px;
+      --list-items-horizontal-padding: 4px;
+      padding: 2px var(--list-items-horizontal-padding);
     }
 
     .dumbgitviewer li:hover {
@@ -167,35 +168,84 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
-    .pane-inner.hscroll-long-lines ul {
-      width: max-content;
-    }
-    .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject {
+    /* long lines display mode - panes */
+    
+    .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject,
+    .pane-inner.ellipsize-long-lines ul#refs > li,
+    .pane-inner.ellipsize-long-lines ul#tree > li,
+    .pane-inner.ellipsize-long-lines#commitDetails *
+    {
       overflow: hidden;          /* required for ellipsis */
       text-overflow: ellipsis;   /* show "…" when clipped */
       white-space: nowrap;       /* prevent wrapping */
     }
-    .pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject {
+    .pane-inner.ellipsize-long-lines#commitDetails .commit-message {
+      white-space: pre;
+    }
+    .pane-inner.ellipsize-long-lines .commit-list-item,
+    .pane-inner.hscroll-long-lines   .commit-list-item,
+    .pane-inner.hscroll-long-lines   ul#refs > li
+    .pane-inner.hscroll-long-lines   ul#tree > li
+    {
+      display: flex;
+    }
+    .pane-inner.hscroll-long-lines ul
+    {
+      width: max-content;
+    }
+    .pane-inner.hscroll-long-lines#commitDetails .commit-message {
+      white-space: pre;
+    }
+    .pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject,
+    .pane-inner.hscroll-long-lines ul#refs > li,
+    .pane-inner.hscroll-long-lines ul#tree > li,
+    .pane-inner.hscroll-long-lines#commitDetails
+    {
       white-space: nowrap;       /* prevent wrapping */
     }
-    .pane-inner.wrap-long-lines .commit-list-item .commit-message-subject {
+    .pane-inner.wrap-long-lines .commit-list-item .commit-message-subject
+    {
       white-space: normal;
       word-wrap: break-word;
     }
-    .pane-inner.ellipsize-long-lines .commit-list-item,
-    .pane-inner.hscroll-long-lines .commit-list-item {
-      display: flex;
+    .pane-inner.wrap-long-lines ul#refs > li,
+    .pane-inner.wrap-long-lines ul#tree > li
+    {
+      word-wrap: anywhere;
+      text-indent: -0.5em;
+      padding-inline-start: calc(0.5em + var(--list-items-horizontal-padding));
     }
-    .pane-inner.wrap-long-lines .commit-list-item {
+    .pane-inner.wrap-long-lines .commit-list-item
+    {
       display: block;
     }
+    .pane-inner.wrap-long-lines#commitDetails .commit-message
+    {
+      white-space: pre-wrap;
+    }
+    .pane-inner.wrap-long-lines#commitDetails .commit-header-line
+    {
+      word-wrap: anywhere;
+      text-indent: -0.5em;
+      padding-inline-start: 0.5em;
+    }
+    .pane-inner.wrap-long-lines#commitDetails .commit-aligned-header-lines,
+    .pane-inner.wrap-long-lines#commitDetails .commit-aligned-header-lines .commit-header-line
+    {
+      display: block;
+    }
+    .pane-inner.wrap-long-lines .commit-datetime
+    {
+      white-space: normal;
+      word-wrap: unset;
+    }
     
-    /* */
+    /* end long lines display mode */
     
     .commit-datetime {
       color: #888;           /* subtle gray */
       font-size: 0.85em;     /* slightly smaller */
-      white-space: nowrap;    /* never wrap */
+      white-space: nowrap;
     }
     .commit-list-item .commit-datetime {
       margin-right: 10px;     /* spacing before message */
@@ -217,7 +267,6 @@
     }
     #commitDetails .commit-message {
       margin-top: 0.75em;
-      white-space: pre-wrap;
     }
     #commitDetails .commit-aligned-header-lines {
       display: grid;
@@ -317,58 +366,59 @@
   </template>
 
   <template id="commit-details-template">
-    <div class="commit-header-line commit-hash-line">
-      <span class="commit-header">commit</span>
-      <span class="commit-hash"></span>
-    </div>
-    
-    <div class="commit-author-equal-committer">
-      <div class="commit-header-line commit-author-line">
-        <span class="commit-header">Author:</span>
-        <span class="commit-author-identity">
-          <span class="commit-author-name"></span>
-          <span class="commit-author-email"></span>
-        </span>
-      </div>
-    </div>
-    
-    <div class="commit-author-differ-committer commit-aligned-header-lines">
-      <div class="commit-header-line commit-author-line">
-        <span class="commit-header">Author:</span>
-        <span class="commit-author-identity">
-          <span class="commit-author-name"></span>
-          <span class="commit-author-email"></span>
-        </span>
+    <div class="commit-headers">
+      <div class="commit-header-line commit-hash-line">
+        <span class="commit-header">commit</span>
+        <span class="commit-hash"></span>
       </div>
       
-      <div class="commit-header-line commit-committer-line">
-        <span class="commit-header">Committer:</span>
-        <span class="commit-committer-identity">
-          <span class="commit-committer-name"></span>
-          <span class="commit-committer-email"></span>
-        </span>
+      <div class="commit-author-equal-committer">
+        <div class="commit-header-line commit-author-line">
+          <span class="commit-header">Author:</span>
+          <span class="commit-author-identity">
+            <span class="commit-author-name"></span>
+            <span class="commit-author-email"></span>
+          </span>
+        </div>
+      </div>
+      
+      <div class="commit-author-differ-committer commit-aligned-header-lines">
+        <div class="commit-header-line commit-author-line">
+          <span class="commit-header">Author:</span>
+          <span class="commit-author-identity">
+            <span class="commit-author-name"></span>
+            <span class="commit-author-email"></span>
+          </span>
+        </div>
+        
+        <div class="commit-header-line commit-committer-line">
+          <span class="commit-header">Committer:</span>
+          <span class="commit-committer-identity">
+            <span class="commit-committer-name"></span>
+            <span class="commit-committer-email"></span>
+          </span>
+        </div>
+      </div>
+      
+      <div class="commit-author-date-equal-committer-date">
+        <div class="commit-header-line commit-date-line commit-author-date-line">
+          <span class="commit-header">Date:</span>
+          <span class="commit-author-datetime commit-datetime"></span>
+        </div>
+      </div>
+      
+      <div class="commit-author-date-differ-committer-date commit-aligned-header-lines">
+        <div class="commit-header-line commit-date-line commit-author-date-line">
+          <span class="commit-header">Authored Date:</span>
+          <span class="commit-author-datetime commit-datetime"></span>
+        </div>
+      
+        <div class="commit-header-line commit-date-line commit-commit-date-line">
+          <span class="commit-header">Commit Date:</span>
+          <span class="commit-commit-datetime commit-datetime"></span>
+        </div>
       </div>
     </div>
-    
-    <div class="commit-author-date-equal-committer-date">
-      <div class="commit-header-line commit-date-line commit-author-date-line">
-        <span class="commit-header">Date:</span>
-        <span class="commit-author-datetime commit-datetime"></span>
-      </div>
-    </div>
-    
-    <div class="commit-author-date-differ-committer-date commit-aligned-header-lines">
-      <div class="commit-header-line commit-date-line commit-author-date-line">
-        <span class="commit-header">Authored Date:</span>
-        <span class="commit-author-datetime commit-datetime"></span>
-      </div>
-    
-      <div class="commit-header-line commit-date-line commit-commit-date-line">
-        <span class="commit-header">Commit Date:</span>
-        <span class="commit-commit-datetime commit-datetime"></span>
-      </div>
-    </div>
-  
     <div class="commit-message"></div>
   </template>
 </body>
