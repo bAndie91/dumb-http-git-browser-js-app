@@ -114,9 +114,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const targetContainer = pane.querySelector('.pane-inner')
     const tpl = document.getElementById('long-lines-display-mode-switcher')
     pane_head.appendChild(tpl.content.cloneNode(true))
+    const default_mode = pane.dataset.defaultLongLinesDisplayMode
     
     const longLinesDisplayModeSwitcherContainer = pane_head.querySelector('.long-lines-display-mode-switcher')
     initLongLinesDisplayModeSwitcherContainer(longLinesDisplayModeSwitcherContainer, pane_name, targetContainer);
-    setLongLinesDisplayMode(longLinesDisplayModeSwitcherContainer, localStorage.getItem(`longLinesDisplayMode-${pane_name}`) || 'hscroll', targetContainer);
+    setLongLinesDisplayMode(longLinesDisplayModeSwitcherContainer, localStorage.getItem(`longLinesDisplayMode-${pane_name}`) || default_mode, targetContainer);
   }
 });

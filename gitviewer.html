@@ -170,10 +170,11 @@
     
     /* long lines display mode - panes */
     
-    .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject,
     .pane-inner.ellipsize-long-lines ul#refs > li,
+    .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject,
+    .pane-inner.ellipsize-long-lines#commitDetails *,
     .pane-inner.ellipsize-long-lines ul#tree > li,
-    .pane-inner.ellipsize-long-lines#commitDetails *
+    .pane-inner.ellipsize-long-lines #file
     {
       overflow: hidden;          /* required for ellipsis */
       text-overflow: ellipsis;   /* show "…" when clipped */
@@ -182,9 +183,9 @@
     .pane-inner.ellipsize-long-lines#commitDetails .commit-message {
       white-space: pre;
     }
+    .pane-inner.hscroll-long-lines   ul#refs > li,
     .pane-inner.ellipsize-long-lines .commit-list-item,
     .pane-inner.hscroll-long-lines   .commit-list-item,
-    .pane-inner.hscroll-long-lines   ul#refs > li
     .pane-inner.hscroll-long-lines   ul#tree > li
     {
       display: flex;
@@ -196,10 +197,11 @@
     .pane-inner.hscroll-long-lines#commitDetails .commit-message {
       white-space: pre;
     }
-    .pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject,
     .pane-inner.hscroll-long-lines ul#refs > li,
+    .pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject,
+    .pane-inner.hscroll-long-lines#commitDetails,
     .pane-inner.hscroll-long-lines ul#tree > li,
-    .pane-inner.hscroll-long-lines#commitDetails
+    .pane-inner.hscroll-long-lines #file
     {
       white-space: nowrap;       /* prevent wrapping */
     }
@@ -219,7 +221,8 @@
     {
       display: block;
     }
-    .pane-inner.wrap-long-lines#commitDetails .commit-message
+    .pane-inner.wrap-long-lines#commitDetails .commit-message,
+    .pane-inner.wrap-long-lines#commitDetails #file
     {
       white-space: pre-wrap;
     }
@@ -298,7 +301,7 @@
 
   <div id="app">
     <div id="panes-main" class="panes horizontal">
-      <div id="pane-refs" class="pane">
+      <div id="pane-refs" class="pane" data-default-long-lines-display-mode="hscroll">
         <h3>Refs</h3>
         <div class="pane-inner">
           <ul id="refs" class="dumbgitviewer"></ul>
@@ -310,7 +313,7 @@
       <div class="pane">
         
         <div id="panes-column-log" class="panes vertical">
-          <div id="pane-log" class="pane">
+          <div id="pane-log" class="pane" data-default-long-lines-display-mode="hscroll">
             <h3>Log</h3>
             <div id="commits-loader" class="pane-inner">
               <ul id="commits" class="dumbgitviewer hscroll-long-lines"></ul>
@@ -319,7 +322,7 @@
           
           <div class="splitter horizontal"></div>
           
-          <div id="pane-commit" class="pane">
+          <div id="pane-commit" class="pane" data-default-long-lines-display-mode="wrap">
             <h3>Commit</h3>
             <div id="commitDetails" class="pane-inner">
             </div>
@@ -329,7 +332,7 @@
       
       <div class="splitter vertical"></div>
   
-      <div id="pane-tree" class="pane">
+      <div id="pane-tree" class="pane" data-default-long-lines-display-mode="hscroll">
         <h3>Tree</h3>
         <div class="pane-inner">
           <ul id="tree" class="dumbgitviewer"></ul>
@@ -338,7 +341,7 @@
       
       <div class="splitter vertical"></div>
   
-      <div id="pane-file" class="pane">
+      <div id="pane-file" class="pane" data-default-long-lines-display-mode="wrap">
         <h3>File</h3>
         <div class="pane-inner">
           <div id="file"></div>
