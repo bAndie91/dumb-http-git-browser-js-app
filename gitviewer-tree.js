@@ -42,5 +42,14 @@ export function renderTree() {
       li.onclick = () => reportException(selectFile, entry.path)
     }
     container.appendChild(li)
+    
+    if(state.selectedFilePath) {
+      if(state.selectedFilePath == entry.path) {
+        selectFile(entry.path);
+      }
+    }
+    else if(['README', 'README.md', 'README.txt'].indexOf(entry.path)>=0) {
+      selectFile(entry.path);
+    }
   }
 }

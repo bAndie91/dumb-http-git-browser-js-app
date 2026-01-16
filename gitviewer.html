@@ -193,6 +193,8 @@
     .pane-inner.hscroll-long-lines ul
     {
       width: max-content;
+      /* min-width: -moz-available; width: stretch; */
+      min-width: 100%;
     }
     .pane-inner.hscroll-long-lines#commitDetails .commit-message {
       white-space: pre;
@@ -203,7 +205,7 @@
     .pane-inner.hscroll-long-lines ul#tree > li,
     .pane-inner.hscroll-long-lines #file
     {
-      white-space: nowrap;       /* prevent wrapping */
+      white-space: nowrap;
     }
     .pane-inner.wrap-long-lines .commit-list-item .commit-message-subject
     {
@@ -288,6 +290,11 @@
     }
     .renderPOD .manpage-reference {
       text-decoration: dotted underline;
+    }
+    
+    a[data-relative-link]::after {
+      /* content: " 📂"; */ /* open folder icon */
+      content: " 📄"; /* document icon */
     }
   </style>
 </head>

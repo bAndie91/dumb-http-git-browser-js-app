@@ -24,7 +24,7 @@ mdRenderer.link = function(obj) {
   {
     // make a safe escaped link text
     const escapedText = obj.text || obj.href
-    return `<a href="#${obj.href}" data-md-link="${obj.href}" title="${obj.title || obj.href}">${escapedText}</a>`
+    return `<a href="javascript:;" data-relative-link="${obj.href}" title="${obj.title || obj.href}">${escapedText}</a>`
     // TODO: let href be a permalink
   }
   return defaultMdRenderer.link.call(this, obj)

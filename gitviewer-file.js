@@ -11,6 +11,7 @@ export async function selectFile(path) {
   const el = document.querySelector(`[data-filepath="${path}"]`)
   state.selectedFileEl = el
   el.classList.add('selected')
+  state.selectedFilePath = path
 
   status(`Loading file: ${path}`)
   clear($('file'))
@@ -48,10 +49,10 @@ export async function selectFile(path) {
       // markdown
       container.innerHTML = renderMarkdown(new TextDecoder().decode(body))
       // attach click handlers for relative links
-      container.querySelectorAll('a[data-md-link]').forEach(a => {
+      container.querySelectorAll('a[data-relative-link]').forEach(a => {
         a.addEventListener('click', e => {
           e.preventDefault()
-          const href = a.getAttribute('data-md-link')
+          const href = a.getAttribute('data-relative-link')
           const basePath = state.selectedFileEl ? state.selectedFileEl.textContent : ''
           const resolved = resolveRelativePath(basePath, href)
           selectFile(resolved)
@@ -104,12 +105,12 @@ function isText(uint8arr) {
 }
 
 function isImage(uint8arr, filename) {
-  const ext = filename.split('.', 1)[0].toLowerCase()
+  const ext = filename.split('.').pop().toLowerCase()
   return ['png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext)
 }
 
 function mimeTypeFromFilename(filename) {
-  const ext = filename.split('.', 1)[0].toLowerCase()
+  const ext = filename.split('.').pop().toLowerCase()
   switch (ext) {
     case 'png': return 'image/png'
     case 'jpg': case 'jpeg': return 'image/jpeg'

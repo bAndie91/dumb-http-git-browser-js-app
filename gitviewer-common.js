@@ -11,6 +11,7 @@ export const state = {
   loadedCommits: 0,
   reachedRoot: false,
   autoLoadedRef: false,
+  selectedFilePath: null,
   
   treeObjects: [],   // list of {mode, type, oid, path} of the current commit
   packfiles: [],
