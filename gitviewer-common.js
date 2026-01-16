@@ -13,7 +13,7 @@ export const state = {
   autoLoadedRef: false,
   selectedFilePath: null,
   
-  treeObjects: [],   // list of {mode, type, oid, path} of the current commit
+  treeObjects: [],   // list of {mode, type, oid, path, filename} of the current commit
   packfiles: [],
   
   selectedRefEl: null,

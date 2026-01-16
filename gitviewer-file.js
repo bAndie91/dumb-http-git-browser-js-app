@@ -6,37 +6,36 @@ import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
 
-export async function selectFile(path) {
+export async function selectFile(filePath) {
   if (state.selectedFileEl) state.selectedFileEl.classList.remove('selected')
-  const el = document.querySelector(`[data-filepath="${path}"]`)
+  const el = $('tree').querySelector(`[data-git-tree-path="${filePath}"]`)
+  if (!el) { throw new Error(`not found element with file path: ${filePath}`) }
   state.selectedFileEl = el
   el.classList.add('selected')
-  state.selectedFilePath = path
+  state.selectedFilePath = filePath
+  const basename = filePath.split('/').pop()
 
-  status(`Loading file: ${path}`)
+  status(`Loading file: ${filePath}`)
   clear($('file'))
 
   // find tree entry
-  const entry = state.treeObjects.find(e => e.path === path)
+  const entry = state.treeObjects.find(e => e.path+e.filename === filePath)
   if (!entry) {
-    status('File not found in current tree')
-    return
+    throw new Error(`File not found in current tree: ${filePath}`)
   }
-
   if (entry.type !== 'blob') {
-    status('Not a file object')
-    return
+    throw new Error(`Not a file object: ${filePath}: ${entry.type}`)
   }
-
+  
   const blobObj = await readObject(state.repoUrl, entry.oid)
-  if (blobObj.type !== 'blob') throw new Error('Not a blob object')
+  if (blobObj.type !== 'blob') throw new Error(`Not a blob object: ${entry.oid}: ${blobObj.type}`)
 
   const body = blobObj.body
 
   // handle rendering
   const container = $('file')
-  if (isImage(body, path)) {
-    const blob = new Blob([body], { type: mimeTypeFromFilename(path) })
+  if (isImage(body, basename)) {
+    const blob = new Blob([body], { type: mimeTypeFromFilename(basename) })
     const url = URL.createObjectURL(blob)
     const img = document.createElement('img')
     img.src = url
@@ -45,7 +44,7 @@ export async function selectFile(path) {
     container.appendChild(img)
   }
   else if (isText(body)) {
-    if (path.toLowerCase().endsWith('.md')) {
+    if (basename.toLowerCase().endsWith('.md')) {
       // markdown
       container.innerHTML = renderMarkdown(new TextDecoder().decode(body))
       // attach click handlers for relative links
@@ -59,10 +58,10 @@ export async function selectFile(path) {
         })
       })
     }
-    else if (path.toLowerCase().endsWith('.pod')) {
+    else if (basename.toLowerCase().endsWith('.pod')) {
       container.innerHTML = renderPOD(new TextDecoder().decode(body))
     }
-    else if (path.match(/\.([0-9][a-zA-Z]*)$/)) {
+    else if (basename.match(/\.([0-9][a-zA-Z]*)$/)) {
       container.innerHTML = renderMan(new TextDecoder().decode(body))
     }
     else {
@@ -82,7 +81,7 @@ export async function selectFile(path) {
     btn.onclick = () => {
       const a = document.createElement('a')
       a.href = url
-      a.download = path
+      a.download = basename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)

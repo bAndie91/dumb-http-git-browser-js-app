@@ -185,8 +185,7 @@
     }
     .pane-inner.hscroll-long-lines   ul#refs > li,
     .pane-inner.ellipsize-long-lines .commit-list-item,
-    .pane-inner.hscroll-long-lines   .commit-list-item,
-    .pane-inner.hscroll-long-lines   ul#tree > li
+    .pane-inner.hscroll-long-lines   .commit-list-item
     {
       display: flex;
     }
@@ -293,8 +292,23 @@
     }
     
     a[data-relative-link]::after {
-      /* content: " 📂"; */ /* open folder icon */
       content: " 📄"; /* document icon */
+      font-size: 70%;
+      display: inline-block;
+      vertical-align: super;
+    }
+    #tree li.folder::before {
+      content: "📁 ";  /* folder icon */
+      padding-inline-end: 0.3em;
+    }
+    #tree li.folder.open::before {
+      content: "📂 ";  /* open folder icon */
+    }
+    #tree li.folder > ul {
+      display: none;
+    }
+    #tree li.folder.open > ul {
+      display: block;
     }
   </style>
 </head>

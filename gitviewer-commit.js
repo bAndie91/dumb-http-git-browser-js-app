@@ -2,7 +2,7 @@
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
 import { selectElements, formatDateTime, createMailtoLink } from './gitviewer-util.js'
 import { readObject } from './gitviewer-object.js'
-import { parseTree, renderTree } from './gitviewer-tree.js'
+import { loadTree } from './gitviewer-tree.js'
 
 export function parseCommit(body) {
   const text = new TextDecoder().decode(body)
@@ -70,17 +70,11 @@ export async function selectCommit(oid) {
 
   updateCommitDetails(commit, oid)
 
-  // fetch tree
-  const treeObj = await readObject(state.repoUrl, commit.tree)
-  if (treeObj.type !== 'tree') {
-    status('Not a tree object')
-    return
-  }
-
-  state.treeObjects = parseTree(treeObj.body)
-
   // render tree pane
-  renderTree()
+  state.treeObjects = []
+  const treeRootEl = $('tree')
+  clear(treeRootEl)
+  await loadTree(treeRootEl, '', commit.tree)
   status('')
 }
 

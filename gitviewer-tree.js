@@ -1,9 +1,9 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { readObject } from './gitviewer-object.js'
 import { selectFile } from './gitviewer-file.js'
 
-export function parseTree(body) {
-  const entries = []
+export function parseTree(body, path) {
   let i = 0
   while (i < body.length) {
     // parse mode
@@ -25,31 +25,69 @@ export function parseTree(body) {
 
     const type = mode.startsWith('4') ? 'tree' : 'blob'
 
-    entries.push({ mode, type, oid, path: filename })
+    state.treeObjects.push({ mode, type, oid, path, filename })
   }
-  return entries
 }
 
-export function renderTree() {
-  const container = $('tree')
-  clear(container)
+export async function loadTree(parentElem, parentPath, treeOID) {
+  // fetch tree
+  const treeObj = await readObject(state.repoUrl, treeOID)
+  if (treeObj.type !== 'tree') {
+    throw new Exception(`Not a tree object: ${treeOID}`)
+  }
+  
+  parseTree(treeObj.body, parentPath)
+  renderTree(parentElem, parentPath)
+}
 
-  for (const entry of state.treeObjects) {
+async function loadSubTree(parentElem, treeOID) {
+  const subtreeElem = document.createElement('UL')
+  const parentPath = parentElem.dataset.gitTreePath+'/'
+  parentElem.appendChild(subtreeElem)
+  await loadTree(subtreeElem, parentPath, treeOID)
+}
+
+async function expandSubTree(li, oid) {
+  const subtreeElem = li.querySelector(':scope > ul')
+  if (!subtreeElem) {
+    await loadSubTree(li, oid)
+    li.classList.add('open')
+  }
+  else {
+    if(li.classList.contains('open')) li.classList.remove('open')
+    else li.classList.add('open')
+  }
+}
+
+async function renderTree(parentElem, parentPath) {
+  for (const entry of state.treeObjects.filter(entry => entry.path == parentPath)) {
+    const filePath = parentPath + entry.filename
     const li = document.createElement('li')
-    li.textContent = entry.path + (entry.type === 'tree' ? '/' : '')
-    li.setAttribute('data-filepath', entry.path)
-    if (entry.type === 'blob') {
-      li.onclick = () => reportException(selectFile, entry.path)
+    li.setAttribute('data-git-tree-path', filePath)
+    li.textContent = entry.filename
+    if (entry.type === 'tree') {
+      li.classList.add('folder')
     }
-    container.appendChild(li)
+    
+    li.onclick = (evt) => {
+      evt.stopPropagation()
+      if (entry.type === 'blob') {
+        reportException(selectFile, filePath)
+      }
+      else if (entry.type === 'tree') {
+        reportException(expandSubTree, li, entry.oid)
+      }
+      else status(`unknown entry type: ${entry.type}`)
+    }
+    parentElem.appendChild(li)
     
     if(state.selectedFilePath) {
-      if(state.selectedFilePath == entry.path) {
-        selectFile(entry.path);
+      if(state.selectedFilePath == filePath) {
+        await selectFile(filePath);
       }
     }
-    else if(['README', 'README.md', 'README.txt'].indexOf(entry.path)>=0) {
-      selectFile(entry.path);
+    else if(['README', 'README.md', 'README.txt'].indexOf(entry.filename)>=0) {
+      await selectFile(filePath);
     }
   }
 }
