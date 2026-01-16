@@ -173,7 +173,7 @@
     .pane-inner.ellipsize-long-lines ul#refs > li,
     .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject,
     .pane-inner.ellipsize-long-lines#commitDetails *,
-    .pane-inner.ellipsize-long-lines ul#tree > li,
+    .pane-inner.ellipsize-long-lines ul#tree li,
     .pane-inner.ellipsize-long-lines #file
     {
       overflow: hidden;          /* required for ellipsis */
@@ -192,8 +192,8 @@
     .pane-inner.hscroll-long-lines ul
     {
       width: max-content;
-      /* min-width: -moz-available; width: stretch; */
       min-width: 100%;
+      min-width: -moz-available; /* width: stretch; */
     }
     .pane-inner.hscroll-long-lines#commitDetails .commit-message {
       white-space: pre;
@@ -299,13 +299,16 @@
     }
     #tree li.folder::before {
       content: "📁 ";  /* folder icon */
-      padding-inline-end: 0.3em;
+      /* padding-inline-end: 0.3em; */
     }
     #tree li.folder.open::before {
       content: "📂 ";  /* open folder icon */
     }
     #tree li.folder > ul {
       display: none;
+      background-color: white;
+      background-color: Canvas;
+      margin-left: 1em;
     }
     #tree li.folder.open > ul {
       display: block;
