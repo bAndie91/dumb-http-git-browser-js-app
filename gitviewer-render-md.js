@@ -40,13 +40,19 @@ mdRenderer.image = function(obj) {
 let toc = [];
 
 mdRenderer.heading = function(obj) {
-    const id = slugify(obj.text);
+    let rendered = defaultMdRenderer.heading.call(this, obj)
+    const html_parser = new DOMParser()
+    const doc = html_parser.parseFromString(rendered, 'text/html');
+    const heading = doc.querySelector(`h${obj.depth}`)
+    let text = heading.innerText
+    const id = slugify(text);
     toc.push({
       level: obj.depth,
-      text: obj.text,
+      text,
       id
     });
-    return `<h${obj.depth} id="${id}">${obj.text}</h${obj.depth}>`;
+    heading.id = id
+    return heading.outerHTML
 }
 
 function buildTocTree(headings) {
