@@ -1,14 +1,12 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { selectElements, formatDateTime, createMailtoLink } from './gitviewer-util.js'
+import { explode, selectElements, formatDateTime, createMailtoLink } from './gitviewer-util.js'
 import { readObject } from './gitviewer-object.js'
 import { loadTree } from './gitviewer-tree.js'
 
 export function parseCommit(body) {
   const text = new TextDecoder().decode(body)
-  const sections = text.split('\n\n')
-  const rawHeaders = sections[0]
-  const message = sections.slice(1).join('\n\n')
+  const [rawHeaders, message] = explode(text, '\n\n', 2)
 
   const headers = {}
   for (const line of rawHeaders.split('\n')) {

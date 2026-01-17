@@ -39,6 +39,11 @@ export function equalBytes(a, b) {
   return true
 }
 
+export function explode(str, sep, count) {
+  const pieces = str.split(sep)
+  return [ pieces.slice(0, count-1), pieces.slice(count-1).join(sep) ].flat()
+}
+
 function loadJsSHA() {
   return new Promise((resolve, reject) => {
     if (window.jsSHA) {

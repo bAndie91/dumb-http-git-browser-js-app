@@ -1,39 +1,40 @@
 
 import { $, status, clear, state, reportException } from './gitviewer-common.js'
+import { explode } from './gitviewer-util.js'
 import { readObject } from './gitviewer-object.js'
 
 import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
 
-export async function selectFile(filePath) {
+export async function selectFile(filePath, jumpToAnchor) {
   if (state.selectedFileEl) state.selectedFileEl.classList.remove('selected')
   const el = $('tree').querySelector(`[data-git-tree-path="${filePath}"]`)
-  if (!el) { throw new Error(`not found element with file path: ${filePath}`) }
+  if (!el) { throw new Error(`${filePath}: not found element with file path.`) }
   state.selectedFileEl = el
   el.classList.add('selected')
   state.selectedFilePath = filePath
+  
   const basename = filePath.split('/').pop()
-
   status(`Loading file: ${filePath}`)
-  clear($('file'))
 
   // find tree entry
   const entry = state.treeObjects.find(e => e.path+e.filename === filePath)
   if (!entry) {
-    throw new Error(`File not found in current tree: ${filePath}`)
+    throw new Error(`${filePath}: file not found in current tree.`)
   }
   if (entry.type !== 'blob') {
-    throw new Error(`Not a file object: ${filePath}: ${entry.type}`)
+    throw new Error(`${filePath}: not a file object, but ${entry.type}.`)
   }
   
   const blobObj = await readObject(state.repoUrl, entry.oid)
-  if (blobObj.type !== 'blob') throw new Error(`Not a blob object: ${entry.oid}: ${blobObj.type}`)
+  if (blobObj.type !== 'blob') throw new Error(`${entry.oid}: not a blob object, but ${blobObj.type}.`)
 
   const body = blobObj.body
 
   // handle rendering
   const container = $('file')
+  clear(container)
   if (isImage(body, basename)) {
     const blob = new Blob([body], { type: mimeTypeFromFilename(basename) })
     const url = URL.createObjectURL(blob)
@@ -52,9 +53,10 @@ export async function selectFile(filePath) {
         a.addEventListener('click', e => {
           e.preventDefault()
           const href = a.getAttribute('data-relative-link')
-          const basePath = state.selectedFileEl ? state.selectedFileEl.textContent : ''
+          const basePath = state.selectedFileEl ? state.selectedFileEl.textContent : '' // FIXME
           const resolved = resolveRelativePath(basePath, href)
-          selectFile(resolved)
+          const [filePath, fragment] = explode(resolved, '#', 2)
+          reportException(selectFile, filePath, fragment)
         })
       })
     }
@@ -90,6 +92,10 @@ export async function selectFile(filePath) {
     container.appendChild(btn)
   }
 
+  if(jumpToAnchor) {
+    location.hash = '#'+jumpToAnchor
+  }
+  
   status('')
 }
 
