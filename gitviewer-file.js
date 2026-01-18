@@ -7,17 +7,7 @@ import { renderPOD } from './gitviewer-render-pod.js'
 import { renderMarkdown } from './gitviewer-render-md.js'
 import { renderMan } from './gitviewer-render-man.js'
 
-export async function selectFile(filePath, jumpToAnchor) {
-  if (state.selectedFileEl) state.selectedFileEl.classList.remove('selected')
-  const el = $('tree').querySelector(`[data-git-tree-path="${filePath}"]`)
-  if (!el) { throw new Error(`${filePath}: not found element with file path.`) }
-  state.selectedFileEl = el
-  el.classList.add('selected')
-  state.selectedFilePath = filePath
-  
-  const basename = filePath.split('/').pop()
-  status(`Loading file: ${filePath}`)
-
+export async function getTreeEntryContent(filePath) {
   // find tree entry
   const entry = state.treeObjects.find(e => e.path+e.filename === filePath)
   if (!entry) {
@@ -30,7 +20,21 @@ export async function selectFile(filePath, jumpToAnchor) {
   const blobObj = await readObject(state.repoUrl, entry.oid)
   if (blobObj.type !== 'blob') throw new Error(`${entry.oid}: not a blob object, but ${blobObj.type}.`)
 
-  const body = blobObj.body
+  return blobObj.body
+}
+
+export async function selectFile(filePath, jumpToAnchor) {
+  if (state.selectedFileEl) state.selectedFileEl.classList.remove('selected')
+  const el = $('tree').querySelector(`[data-git-tree-path="${filePath}"]`)
+  if (!el) { throw new Error(`${filePath}: not found element with file path.`) }
+  state.selectedFileEl = el
+  el.classList.add('selected')
+  state.selectedFilePath = filePath
+  
+  const basename = filePath.split('/').pop()
+  status(`Loading file: ${filePath}`)
+
+  const body = await getTreeEntryContent(filePath)
 
   // handle rendering
   const container = $('file')
@@ -47,13 +51,13 @@ export async function selectFile(filePath, jumpToAnchor) {
   else if (isText(body)) {
     if (basename.toLowerCase().endsWith('.md')) {
       // markdown
-      container.innerHTML = renderMarkdown(new TextDecoder().decode(body))
+      container.innerHTML = await renderMarkdown(new TextDecoder().decode(body))
       // attach click handlers for relative links
       container.querySelectorAll('a[data-relative-link]').forEach(a => {
         a.addEventListener('click', e => {
           e.preventDefault()
           const href = a.getAttribute('data-relative-link')
-          const basePath = state.selectedFileEl ? state.selectedFileEl.textContent : '' // FIXME
+          const basePath = state.selectedFilePath
           const resolved = resolveRelativePath(basePath, href)
           const [filePath, fragment] = explode(resolved, '#', 2)
           reportException(selectFile, filePath, fragment)
@@ -114,7 +118,7 @@ function isImage(uint8arr, filename) {
   return ['png','jpg','jpeg','gif','bmp','webp','svg'].includes(ext)
 }
 
-function mimeTypeFromFilename(filename) {
+export function mimeTypeFromFilename(filename) {
   const ext = filename.split('.').pop().toLowerCase()
   switch (ext) {
     case 'png': return 'image/png'
@@ -127,7 +131,7 @@ function mimeTypeFromFilename(filename) {
   }
 }
 
-function resolveRelativePath(basePath, relative) {
+export function resolveRelativePath(basePath, relative) {
   if (!relative) return basePath
   if (relative.startsWith('/')) return relative.replace(/^\/+/, '')
 

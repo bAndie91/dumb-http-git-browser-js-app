@@ -1,4 +1,7 @@
 
+import { state } from './gitviewer-common.js'
+import { mimeTypeFromFilename, getTreeEntryContent, resolveRelativePath } from './gitviewer-file.js'
+
 const defaultMdRenderer = new marked.Renderer()
 const mdRenderer = new marked.Renderer()
 
@@ -12,7 +15,7 @@ function slugify(text) {
 }
 
 function isAbsoluteLink(link) {
-  return link.match(/^([^/]+):\/\//)
+  return link.match(/^([^/]+):/)
 }
 function isFragmentLink(link) {
   return link.match(/^#/)
@@ -32,10 +35,37 @@ mdRenderer.link = function(obj) {
 
 mdRenderer.image = function(obj) {
   if(!isAbsoluteLink(obj.href)) {
-    obj.href = null // TODO image source points into the repo, make a "data:" URL
+    const imageLink = obj.href
+    obj.href = ''
+    const rendered = defaultMdRenderer.image.call(this, obj)
+    const html_parser = new DOMParser()
+    const doc = html_parser.parseFromString(rendered, 'text/html')
+    const img = doc.querySelector(`img`)
+    const img_id = 'gitviewer-img-' + Math.random().toString(36).substr(2, 9)
+    img.id = img_id
+    
+    const basePath = state.selectedFilePath
+    const resolvedPath = resolveRelativePath(basePath, imageLink)
+    getTreeEntryContent(resolvedPath).then((body) => {
+      const basename = imageLink.split('/').pop()
+      const blob = new Blob([body], { type: mimeTypeFromFilename(basename) })
+      const updateImageSrc = () => {
+        const img = document.getElementById(img_id)
+        if(img) {
+          img.src = URL.createObjectURL(blob)
+        }
+        else {
+          // <img> not yet appended to the DOM
+          setTimeout(updateImageSrc, 200)
+        }
+      }
+      updateImageSrc()
+    })
+    return img.outerHTML
   }
   return defaultMdRenderer.image.call(this, obj)
 }
+
 
 let toc = [];
 
@@ -90,6 +120,7 @@ function renderToc(nodes) {
 export function renderMarkdown(body) {
   toc = [];
   let rendered = marked.parse(body, { renderer: mdRenderer })
+  
   const tocTree = buildTocTree(toc);
   const tocHtml = renderToc(tocTree);
   if(tocHtml != '') {
