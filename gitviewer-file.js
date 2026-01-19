@@ -39,6 +39,7 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
   // handle rendering
   const container = $('file')
   clear(container)
+  $('fileFormatSwitcher').style.display = 'none'  /* always hide for non-text contents */
   
   if (isImage(body, basename)) {
     const blob = new Blob([body], { type: mimeTypeFromFilename(basename) })
