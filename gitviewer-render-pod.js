@@ -1,13 +1,22 @@
 
 import { escapeHtml } from './gitviewer-util.js';
 
-export function renderPOD(pod) {
-   const lines = pod.split('\n');
+export function renderPOD(fileContent) {
+   // POD documentation can start implicitly or with =pod
+   // If there's an explicit =pod tag, we start outside POD sections.
+   // need a beginning =pod tag to start parsing POD if there is at least 1 in the file
+   let inPOD = !fileContent.match(/^=pod(\s|$)/m)
+   let mixedPODnonPOD = false
+   const lines = fileContent.split('\n');
    const html = [];
    const listStack = [];
    let inVerbatim = false;
    let verbatimBuffer = [];
    let paragraphBuffer = [];
+   let sectionBuffer = []; // Buffer for current section (POD or non-POD)
+   let currentSectionType = inPOD ? 'pod' : 'non-pod'; // Track current section type
+   let suspendedListStack = null; // Store list state when leaving POD mode
+   let listItemCounters = {}; // Track item counts for ordered lists
 
    function getCurrentList() {
        return listStack.length > 0 ? listStack[listStack.length - 1] : null;
@@ -20,7 +29,7 @@ export function renderPOD(pod) {
            if (currentList && currentList.currentItem !== null) {
                currentList.currentItem.push('<pre><code>' + content + '</code></pre>');
            } else {
-               html.push('<pre><code>' + content + '</code></pre>');
+               sectionBuffer.push('<pre><code>' + content + '</code></pre>');
            }
            verbatimBuffer = [];
        }
@@ -35,7 +44,7 @@ export function renderPOD(pod) {
            if (currentList && currentList.currentItem !== null) {
                currentList.currentItem.push('<p>' + processed + '</p>');
            } else {
-               html.push('<p>' + processed + '</p>');
+               sectionBuffer.push('<p>' + processed + '</p>');
            }
            paragraphBuffer = [];
        }
@@ -44,8 +53,13 @@ export function renderPOD(pod) {
    function closeListItem() {
        const currentList = getCurrentList();
        if (currentList && currentList.currentItem !== null) {
-           html.push('<li>' + currentList.currentItem.join('') + '</li>');
+           sectionBuffer.push('<li>' + currentList.currentItem.join('') + '</li>');
            currentList.currentItem = null;
+           // Increment counter for ordered lists
+           if (currentList.type === 'ol') {
+               const listId = currentList.id;
+               listItemCounters[listId] = (listItemCounters[listId] || 0) + 1;
+           }
        }
    }
 
@@ -53,7 +67,71 @@ export function renderPOD(pod) {
        if (listStack.length > 0) {
            closeListItem();
            const list = listStack.pop();
-           html.push(list.type === 'ul' ? '</ul>' : '</ol>');
+           sectionBuffer.push(list.type === 'ul' ? '</ul>' : '</ol>');
+       }
+   }
+
+   function flushSection() {
+       if (sectionBuffer.length > 0) {
+           html.push(`<div class="${currentSectionType}-portion">` + sectionBuffer.join('\n') + '</div>');
+           sectionBuffer = [];
+       }
+   }
+
+   function suspendLists() {
+       // Close current list item but don't close the lists themselves
+       closeListItem();
+       // Deep copy the list stack to preserve state
+       suspendedListStack = listStack.map(list => ({
+           type: list.type,
+           currentItem: null,
+           id: list.id,
+           startNumber: list.type === 'ol' ? (listItemCounters[list.id] || 0) + 1 : undefined
+       }));
+   }
+
+   function resumeLists() {
+       if (suspendedListStack && suspendedListStack.length > 0) {
+           // Restore the list stack
+           listStack.length = 0;
+           for (const list of suspendedListStack) {
+               listStack.push({
+                   type: list.type,
+                   currentItem: null,
+                   id: list.id
+               });
+               // Reopen the list with appropriate attributes
+               if (list.type === 'ol' && list.startNumber > 1) {
+                   sectionBuffer.push('<ol start="' + list.startNumber + '">');
+               } else {
+                   sectionBuffer.push(list.type === 'ul' ? '<ul>' : '<ol>');
+               }
+           }
+           suspendedListStack = null;
+       }
+   }
+
+   function switchSection(newType) {
+       if (currentSectionType !== newType) {
+           mixedPODnonPOD = true
+           flushParagraph();
+           flushVerbatim();
+           if (newType === 'non-pod' && listStack.length > 0) {
+             // Leaving POD mode with open lists - suspend them
+             suspendLists();
+           }
+           else {
+             // Normal case - close all lists
+             while (listStack.length > 0) {
+               closeList();
+             }
+           }
+           flushSection();
+           currentSectionType = newType;
+           if (newType === 'pod') {
+               // Returning to POD mode - resume suspended lists if any
+               resumeLists();
+           }
        }
    }
 
@@ -79,6 +157,7 @@ export function renderPOD(pod) {
        return entityMap[entity] || '&' + entity + ';';
    }
 
+   /*
    function findMatchingBrackets(text, startPos) {
        let count = 1;
        let pos = startPos;
@@ -89,6 +168,7 @@ export function renderPOD(pod) {
        }
        return count === 0 ? pos : -1;
    }
+   */
 
    function renderPodTag(code, text, i) {
        let bracketCount = 0;
@@ -173,7 +253,7 @@ export function renderPOD(pod) {
        return { text: replacement, continuePos: i };
    }
 
-    function processFormatting(text) {
+   function processFormatting(text) {
        const codes = ['Z', 'E', 'S', 'B', 'I', 'C', 'F', 'L'];
        let newText = '';
        let i = 0;
@@ -198,83 +278,104 @@ export function renderPOD(pod) {
        const line = lines[i];
        const trimmed = line.trim();
 
-       if (trimmed === '=pod' || trimmed === '=cut') {
-           continue;
+       // Handle POD/non-POD transitions
+       if (trimmed === '=pod') {
+         switchSection('pod')
+         inPOD = true
+         continue
+       }
+       if (trimmed === '=cut') {
+         switchSection('non-pod')
+         inPOD = false
+         continue
        }
 
-       if (line.length > 0 && (line[0] === ' ' || line[0] === '\t')) {
-           flushParagraph();
-           if (!inVerbatim) {
-               inVerbatim = true;
-           }
-           verbatimBuffer.push(line.substring(1));
-           continue;
-       } else if (inVerbatim) {
-           flushVerbatim();
-       }
-
-       if (trimmed === '') {
-           flushParagraph();
-           continue;
-       }
-
-       const headMatch = trimmed.match(/^=head([1-6])\s+(.+)$/);
-       if (headMatch) {
-           flushParagraph();
-           const level = headMatch[1];
-           const heading = headMatch[2];
-           const id = slugify(heading);
-           html.push('<h' + level + ' id="' + id + '">' + processFormatting(heading) + '</h' + level + '>');
-           continue;
-       }
-
-       if (trimmed === '=over' || trimmed.match(/^=over\s+\d+$/)) {
-           flushParagraph();
-           closeListItem();
-           listStack.push({ type: null, currentItem: null });
-           continue;
-       }
-
-       if (trimmed.startsWith('=item ')) {
-           flushParagraph();
-           const currentList = getCurrentList();
-           
-           if (currentList) {
-               closeListItem();
-               const itemText = trimmed.substring(6);
-               
-               if (currentList.type === null) {
-                   currentList.type = itemText.match(/^\d+\.?/) ? 'ol' : 'ul';
-                   html.push(currentList.type === 'ul' ? '<ul>' : '<ol>');
-               }
-
-               currentList.currentItem = [];
-               let cleanItem = itemText.replace(/^[\*\d\.]\s*/, '');
-               currentList.currentItem.push(processFormatting(cleanItem));
-           }
-           continue;
-       }
-
-       if (trimmed === '=back') {
-           flushParagraph();
-           closeList();
-           continue;
-       }
-
-       if (trimmed.startsWith('=') && !trimmed.startsWith('==')) {
-           flushParagraph();
-           html.push('<div class="pod-command-unknown">' + escapeHtml(trimmed) + '</div>');
-           continue;
-       }
-
-       paragraphBuffer.push(line);
+       if (inPOD) {
+         if (line.length > 0 && (line[0] === ' ' || line[0] === '\t')) {
+             flushParagraph();
+             if (!inVerbatim) {
+                 inVerbatim = true;
+             }
+             verbatimBuffer.push(line.substring(1));
+             continue;
+         } else if (inVerbatim) {
+             flushVerbatim();
+         }
+  
+         if (trimmed === '') {
+             flushParagraph();
+             continue;
+         }
+  
+         const headMatch = trimmed.match(/^=head([1-6])\s+(.+)$/);
+         if (headMatch) {
+             flushParagraph();
+             const level = headMatch[1];
+             const heading = headMatch[2];
+             const id = slugify(heading);
+             sectionBuffer.push('<h' + level + ' id="' + id + '">' + processFormatting(heading) + '</h' + level + '>');
+             continue;
+         }
+  
+         if (trimmed === '=over' || trimmed.match(/^=over\s+\d+$/)) {
+             flushParagraph();
+             closeListItem();
+             const listId = 'list_' + Math.random().toString(36).substr(2, 9);
+             listStack.push({ type: null, currentItem: null, id: listId });
+             continue;
+         }
+  
+         if (trimmed.startsWith('=item ')) {
+             flushParagraph();
+             const currentList = getCurrentList();
+             
+             if (currentList) {
+                 closeListItem();
+                 const itemText = trimmed.substring(6);
+                 
+                 if (currentList.type === null) {
+                     currentList.type = itemText.match(/^\d+\.?/) ? 'ol' : 'ul';
+                     if (currentList.type === 'ol') {
+                         // Initialize counter for this list
+                         listItemCounters[currentList.id] = 0;
+                     }
+                     sectionBuffer.push(currentList.type === 'ul' ? '<ul>' : '<ol>');
+                 }
+  
+                 currentList.currentItem = [];
+                 let cleanItem = itemText.replace(/^[\*\d\.]\s*/, '');
+                 currentList.currentItem.push(processFormatting(cleanItem));
+             }
+             continue;
+         }
+  
+         if (trimmed === '=back') {
+             flushParagraph();
+             closeList();
+             continue;
+         }
+  
+         if (trimmed.startsWith('=') && !trimmed.startsWith('==')) {
+             flushParagraph();
+             sectionBuffer.push('<div class="pod-command-unknown">' + escapeHtml(trimmed) + '</div>');
+             continue;
+         }
+  
+         paragraphBuffer.push(line);
+     }
+     else {
+       // Non-POD content is rendered as preformatted code
+       sectionBuffer.push(escapeHtml(line));
+     }
    }
 
+   // Flush any remaining content
    flushParagraph();
    flushVerbatim();
    while (listStack.length > 0) {
        closeList();
    }
+   flushSection();
 
-   return '<div class="renderPOD">' + html.join('\n') + '</div>';
+   return `<div class="renderPOD ${mixedPODnonPOD ? "pod-mixed-non-pod" : ""}">` + html.join('\n') + '</div>';
 }

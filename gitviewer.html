@@ -62,6 +62,11 @@
       justify-content: space-between;
     }
     
+    .pane > h3 .controls {
+      display: flex;
+      gap: 0.75em;
+    }
+    
     .pane-inner {
       overflow: auto;
       height: 100%;
@@ -138,7 +143,8 @@
     
     /* the long lines display mode switcher(s) */
     
-    .long-lines-display-mode-switcher {
+    .long-lines-display-mode-switcher,
+    #fileFormatSwitcher {
       display: flex;
       gap: 2px;
       background: #ddd;
@@ -146,7 +152,8 @@
       padding: 2px;
     }
 
-    .long-lines-display-mode-switcher button {
+    .long-lines-display-mode-switcher button,
+    #fileFormatSwitcher button {
       background: transparent;
       border: none;
       padding: 1px 5px;
@@ -157,12 +164,14 @@
       color: #666;
     }
 
-    .long-lines-display-mode-switcher button:hover {
+    .long-lines-display-mode-switcher button:hover,
+    #fileFormatSwitcher button:hover {
       background: #ccc;
       color: #333;
     }
 
-    .long-lines-display-mode-switcher button[aria-checked="true"] {
+    .long-lines-display-mode-switcher button[aria-checked="true"],
+    #fileFormatSwitcher button[aria-checked="true"] {
       background: #fff;
       color: #000;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
@@ -290,6 +299,16 @@
     .renderPOD .manpage-reference {
       text-decoration: dotted underline;
     }
+    .renderPOD.pod-mixed-non-pod .pod-portion {
+      background-color: whitesmoke;
+      margin: 1em 0;
+      padding: 0.1em 0.5em;
+    }
+    .renderPOD .non-pod-portion {
+      white-space: pre;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
     
     a[data-relative-link]::after {
       content: "📄"; /* document icon */
@@ -326,7 +345,9 @@
   <div id="app">
     <div id="panes-main" class="panes horizontal">
       <div id="pane-refs" class="pane" data-default-long-lines-display-mode="hscroll">
-        <h3>Refs</h3>
+        <h3>Refs
+          <div class="controls"></div>
+        </h3>
         <div class="pane-inner">
           <ul id="refs" class="dumbgitviewer"></ul>
         </div>
@@ -338,7 +359,9 @@
         
         <div id="panes-column-log" class="panes vertical">
           <div id="pane-log" class="pane" data-default-long-lines-display-mode="hscroll">
-            <h3>Log</h3>
+            <h3>Log
+              <div class="controls"></div>
+            </h3>
             <div id="commits-loader" class="pane-inner">
               <ul id="commits" class="dumbgitviewer hscroll-long-lines"></ul>
             </div>
@@ -347,7 +370,9 @@
           <div class="splitter horizontal"></div>
           
           <div id="pane-commit" class="pane" data-default-long-lines-display-mode="wrap">
-            <h3>Commit</h3>
+            <h3>Commit
+              <div class="controls"></div>
+            </h3>
             <div id="commitDetails" class="pane-inner">
             </div>
           </div>
@@ -357,7 +382,9 @@
       <div class="splitter vertical"></div>
   
       <div id="pane-tree" class="pane" data-default-long-lines-display-mode="hscroll">
-        <h3>Tree</h3>
+        <h3>Tree
+          <div class="controls"></div>
+        </h3>
         <div class="pane-inner">
           <ul id="tree" class="dumbgitviewer"></ul>
         </div>
@@ -366,7 +393,16 @@
       <div class="splitter vertical"></div>
   
       <div id="pane-file" class="pane" data-default-long-lines-display-mode="wrap">
-        <h3>File</h3>
+        <h3>File
+          <div class="controls">
+            <div id="fileFormatSwitcher" role="radiogroup">
+              <button role="radio" aria-checked="true" data-format="raw">raw</button>
+              <button role="radio" aria-checked="false" data-format="pod">POD</button>
+              <button role="radio" aria-checked="false" data-format="man">man</button>
+              <button role="radio" aria-checked="false" data-format="md">MD</button>
+            </div>
+          </div>
+        </h3>
         <div class="pane-inner">
           <div id="file"></div>
         </div>

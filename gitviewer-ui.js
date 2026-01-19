@@ -110,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
   
   for(const pane_name of ['refs', 'log', 'commit', 'tree', 'file']) {
     const pane = document.getElementById(`pane-${pane_name}`)
-    const pane_head = pane.querySelector('h3')
+    const pane_head = pane.querySelector('h3 .controls')
     const targetContainer = pane.querySelector('.pane-inner')
     const tpl = document.getElementById('long-lines-display-mode-switcher')
     pane_head.appendChild(tpl.content.cloneNode(true))

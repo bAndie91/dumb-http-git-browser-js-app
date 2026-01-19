@@ -23,7 +23,7 @@ export async function getTreeEntryContent(filePath) {
   return blobObj.body
 }
 
-export async function selectFile(filePath, jumpToAnchor) {
+export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
   if (state.selectedFileEl) state.selectedFileEl.classList.remove('selected')
   const el = $('tree').querySelector(`[data-git-tree-path="${filePath}"]`)
   if (!el) { throw new Error(`${filePath}: not found element with file path.`) }
@@ -39,6 +39,7 @@ export async function selectFile(filePath, jumpToAnchor) {
   // handle rendering
   const container = $('file')
   clear(container)
+  
   if (isImage(body, basename)) {
     const blob = new Blob([body], { type: mimeTypeFromFilename(basename) })
     const url = URL.createObjectURL(blob)
@@ -49,7 +50,17 @@ export async function selectFile(filePath, jumpToAnchor) {
     container.appendChild(img)
   }
   else if (isText(body)) {
-    if (basename.toLowerCase().endsWith('.md')) {
+    let detectedFileFormat = 'raw'
+    if (basename.toLowerCase().endsWith('.md'))       detectedFileFormat = 'md'
+    else if (basename.toLowerCase().endsWith('.pod')) detectedFileFormat = 'pod'
+    else if (basename.match(/\.([0-9][a-zA-Z]*)$/))   detectedFileFormat = 'man'
+    let finalFileFormat = forceFileFormat ? forceFileFormat : detectedFileFormat
+    const fileFormatOptions = new Set()
+    fileFormatOptions.add(detectedFileFormat)
+    fileFormatOptions.add(finalFileFormat)
+    fileFormatOptions.add('raw')
+    
+    if (finalFileFormat == 'md') {
       // markdown
       container.innerHTML = await renderMarkdown(new TextDecoder().decode(body))
       // attach click handlers for relative links
@@ -64,19 +75,29 @@ export async function selectFile(filePath, jumpToAnchor) {
         })
       })
     }
-    else if (basename.toLowerCase().endsWith('.pod')) {
+    else if (finalFileFormat == 'pod') {
       container.innerHTML = renderPOD(new TextDecoder().decode(body))
     }
-    else if (basename.match(/\.([0-9][a-zA-Z]*)$/)) {
+    else if (finalFileFormat == 'man') {
       container.innerHTML = renderMan(new TextDecoder().decode(body))
     }
     else {
-      // plain text
+      // raw plain text
       const pre = document.createElement('pre')
       pre.textContent = new TextDecoder().decode(body)
       container.appendChild(pre)
       // TODO: add line numbering
+      
+      if(pre.textContent.match(/^=pod(\s|$)/m)) fileFormatOptions.add('pod')
     }
+    
+    const fileFormatButtons = $('fileFormatSwitcher').querySelectorAll('button');
+    fileFormatButtons.forEach(btn => {
+      const isActive = btn.dataset.format === finalFileFormat;
+      btn.setAttribute('aria-checked', isActive);
+      btn.style.display = fileFormatOptions.has(btn.dataset.format) ? '' : 'none'
+    });
+    $('fileFormatSwitcher').style.display = fileFormatOptions.size < 2 ? 'none' : ''
   }
   else {
     const blob = new Blob([body], { type: 'application/octet-stream' })
@@ -144,3 +165,12 @@ export function resolveRelativePath(basePath, relative) {
   }
   return parts.join('/')
 }
+
+
+/* initiate the file format switcher buttons */
+const fileFormatButtons = $('fileFormatSwitcher').querySelectorAll('button');
+fileFormatButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectFile(state.selectedFilePath, null, btn.dataset.format)
+  })
+})
