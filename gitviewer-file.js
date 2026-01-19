@@ -80,7 +80,7 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
       container.innerHTML = renderPOD(new TextDecoder().decode(body))
     }
     else if (finalFileFormat == 'man') {
-      container.innerHTML = renderMan(new TextDecoder().decode(body))
+      container.innerHTML = await renderMan(new TextDecoder().decode(body))
     }
     else {
       // raw plain text
@@ -90,6 +90,7 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
       // TODO: add line numbering
       
       if(pre.textContent.match(/^=pod(\s|$)/m)) fileFormatOptions.add('pod')
+      if(pre.textContent.match(/^\.(TH|SH|SS) /m)) fileFormatOptions.add('man')
     }
     
     const fileFormatButtons = $('fileFormatSwitcher').querySelectorAll('button');
