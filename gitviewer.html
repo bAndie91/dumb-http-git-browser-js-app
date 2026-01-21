@@ -176,13 +176,21 @@
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
+    #dumbgitviewerFile[data-format=man] dl { margin-left: 2em; }
+    #dumbgitviewerFile[data-format=man] dt { font-weight: bold; }
+    #dumbgitviewerFile[data-format=man] pre { background: #f7f7f7; padding: .5em; border: 1px solid #ddd; overflow-x:auto; }
+    #dumbgitviewerFile[data-format=man] .troff-macro-unknown { cursor: pointer; color: gray; font-size: .9em; border-bottom: 1px dashed; }
+    #dumbgitviewerFile[data-format=man] .troff-macro-unknown > span { display: none; }
+    #dumbgitviewerFile[data-format=man] .troff-macro-unknown.expanded > span { display: initial; }
+
+    
     /* long lines display mode - panes */
     
     .pane-inner.ellipsize-long-lines ul#refs > li,
     .pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject,
     .pane-inner.ellipsize-long-lines#commitDetails *,
     .pane-inner.ellipsize-long-lines ul#tree li,
-    .pane-inner.ellipsize-long-lines #file
+    .pane-inner.ellipsize-long-lines #dumbgitviewerFile
     {
       overflow: hidden;          /* required for ellipsis */
       text-overflow: ellipsis;   /* show "…" when clipped */
@@ -210,7 +218,7 @@
     .pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject,
     .pane-inner.hscroll-long-lines#commitDetails,
     .pane-inner.hscroll-long-lines ul#tree > li,
-    .pane-inner.hscroll-long-lines #file
+    .pane-inner.hscroll-long-lines #dumbgitviewerFile
     {
       white-space: nowrap;
     }
@@ -231,9 +239,13 @@
       display: block;
     }
     .pane-inner.wrap-long-lines#commitDetails .commit-message,
-    .pane-inner.wrap-long-lines#commitDetails #file
+    .pane-inner.wrap-long-lines #dumbgitviewerFile[data-format=raw]
     {
       white-space: pre-wrap;
+    }
+    .pane-inner.wrap-long-lines #dumbgitviewerFile
+    {
+      white-space: normal;
     }
     .pane-inner.wrap-long-lines#commitDetails .commit-header-line
     {
@@ -402,7 +414,7 @@
           </div>
         </h3>
         <div class="pane-inner">
-          <div id="file"></div>
+          <div id="dumbgitviewerFile"></div>
         </div>
       </div>
     </div>

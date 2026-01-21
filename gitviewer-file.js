@@ -37,8 +37,9 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
   const body = await getTreeEntryContent(filePath)
 
   // handle rendering
-  const container = $('file')
+  const container = $('dumbgitviewerFile')
   clear(container)
+  $('dumbgitviewerFile').dataset.format = ''
   $('fileFormatSwitcher').style.display = 'none'  /* always hide for non-text contents */
   
   if (isImage(body, basename)) {
@@ -56,6 +57,8 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
     else if (basename.toLowerCase().endsWith('.pod')) detectedFileFormat = 'pod'
     else if (basename.match(/\.([0-9][a-zA-Z]*)$/))   detectedFileFormat = 'man'
     let finalFileFormat = forceFileFormat ? forceFileFormat : detectedFileFormat
+    $('dumbgitviewerFile').dataset.format = finalFileFormat
+    
     const fileFormatOptions = new Set()
     fileFormatOptions.add(detectedFileFormat)
     fileFormatOptions.add(finalFileFormat)

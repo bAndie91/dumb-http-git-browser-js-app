@@ -2906,7 +2906,8 @@ HTMLGenerator.prototype.reduceRecursive = function (result, node) {
  */
 HTMLGenerator.prototype.undefMacro = function (args, node) {
   console.warn('Unsupported macro:', node.value);
-  return args;
+  //return args;
+  return '';
 };
 
 /**
