@@ -1,158 +1,207 @@
 
-import { escapeHtml } from './gitviewer-util.js';
+function parseTroff(troffText) {
+  const lines = troffText.split(/\r?\n/);
+  let html = '', stack = [];  // stack to track open lists or blocks
 
-// --- Tokenizer ---
-function tokenize(text) {
-  return text.split("\n").map(line => {
-    if (line.trim().startsWith(".\"")) return { type:"comment" };
-    const m = line.match(/^\.(\S+)(?:\s+(.*))?$/);
-    return m
-      ? { type: "macro", name: m[1], args: m[2] || "" }
-      : { type: "text", text: line };
-  });
-}
+  for (let rawLine of lines) {
+    // 1. Remove comment lines
+    if (/^\.\\[""]/.test(rawLine)) continue;
 
-// ---- Inline troff escape processing ----
-function processTroffEscapes(text) {
-  let out = "";
-  for (let i = 0; i < text.length; i++) {
-    if (text[i] === "\\" && i+1 < text.length) {
-      const next = text[i+1];
-      switch (next) {
-        case "e": out += "\\"; i++; break; // literal backslash
-        case "-": out += "-"; i++; break;  // troff minus
-        case "\"": return out; // comment rest ignored
-        // TODO support \fB, \fI, \fP, \fR, ...
+    // 2. Unescape common escapes (\- → -, \\\& → '', etc.) as needed
+    let line = rawLine.replace(/\\-/g, '-').replace(/\\\&/g, '')
+                      .replace(/\\fB/g, '<span class="fB">')
+                      .replace(/\\fI/g, '<span class="fI">')
+                      .replace(/\\f[PR]/g, '</span>'); 
+    // (handling of \fP should close whichever font was last opened)
+
+    // 3. Match a macro at line start
+    let m = line.match(/^\.(\S+)(?:\s+(.*))?$/);
+    if (m) {
+      let [, macro, args] = m;
+      args = args || '';
+      switch (macro) {
+        case 'TH':
+          // Title: .TH title section date source manual
+          let titleText = args.split(/\s+/)[0];
+          html += `<h1 class="TH">${titleText}</h1>\n`;
+          break;
+        case 'SH':
+          html += `<section class="SH"><h2>${args}</h2>\n`;
+          break;
+        case 'SS':
+          html += `<h3 class="SS">${args}</h3>\n`;
+          break;
+        case 'PP':
+        case 'LP':
+        case 'HP':
+        case 'P':
+          html += `<p class="${macro}">${args}`;
+          break;
+        case 'BR':
+        case 'BI':
+        case 'IR':
+        case 'RB':
+        case 'RI':
+          // Two-part font macros: e.g. .BR bold text, roman text
+          const parts = args.split(/\s+/, 2);
+          if (parts[0]) html += `<strong class="${macro}">${parts[0]}</strong>`;
+          if (parts[1]) html += ` ${parts[1]}`;
+          break;
+        case 'B':
+          html += `<strong class="B">${args}</strong>`;
+          break;
+        case 'I':
+          html += `<em class="I">${args}</em>`;
+          break;
+        case 'EX':
+          html += `<pre class="EX">`;
+          stack.push('EX');
+          break;
+        case 'EE':
+          // End example block
+          html += `</pre>\n`;
+          stack.pop();
+          break;
+        case 'nf':
+          html += `<pre class="nf">`;
+          stack.push('nf');
+          break;
+        case 'fi':
+          html += `</pre>\n`;
+          stack.pop();
+          break;
+        case 'Bl':  // begin list (.Bl -enum, -bullet, etc.)
+          if (args.includes('-enum')) {
+            html += `<ol class="Bl">`;
+            stack.push('ol');
+          } else {
+            html += `<ul class="Bl">`;
+            stack.push('ul');
+          }
+          break;
+        case 'El':  // end list
+          const listType = stack.pop();
+          html += listType === 'ol' ? `</ol>\n` : `</ul>\n`;
+          break;
+        case 'It':  // list item
+          html += `<li class="It">${args}`;
+          break;
+        case 'IP':
+          // Indented/tagged paragraph. E.g. .IP \(bu starts a bullet list.
+          if (/\\\(bu/.test(line) || args.startsWith('\\(bu')) {
+            // Start bullet list if not already in one
+            if (stack[stack.length-1] !== 'ul') {
+              html += `<ul class="IP">`;
+              stack.push('ul');
+            }
+            html += `<li class="IP">`;
+          } else {
+            // Tagged list: .IP tag text
+            const [tag, ...rest] = args.split(/\s+/);
+            html += `<dt class="IP">${tag}</dt><dd class="IP">${rest.join(' ')}`;
+          }
+          break;
+        case 'TP':
+        case 'TQ':
+          // Tagged paragraph in man macros: definition list entry
+          // If starting new definition list:
+          if (!stack.includes('dl')) {
+            html += `<dl class="TP">\n`;
+            stack.push('dl');
+          }
+          html += `<dt class="${macro}">`;  // term
+          // the actual term text should follow on this line or next
+          break;
+        case 'UR':
+          // Hyperlink start: .UR URL
+          html += `<a href="${args}" class="UR">`;
+          stack.push('a');  // mark that we're inside a link
+          break;
+        case 'UE':
+          // End hyperlink: close <a>
+          html += `</a>`;
+          stack.pop();
+          break;
+        case 'MT':
+          // Mail link start: .MT email
+          html += `<a href="mailto:${args}" class="MT">`;
+          stack.push('a');
+          break;
+        case 'ME':
+          // End mail link
+          html += `</a>`;
+          stack.pop();
+          break;
+        case 'RS':
+          // Relative indent (blockquote)
+          html += `<blockquote class="RS">`;
+          stack.push('blockquote');
+          break;
+        case 'RE':
+          html += `</blockquote>\n`;
+          stack.pop();
+          break;
+        case 'RS':
+          html += `<blockquote class="RS">`; 
+          stack.push('blockquote');
+          break;
+        case 'PD':
+          // Paragraph delimit (could close and start new p)
+          html += `</p><p class="PD">`;
+          break;
+        case 'INDENT':
+          // Custom indent
+          html += `<div class="INDENT">`;
+          stack.push('div');
+          break;
+        case 'UNINDENT':
+          html += `</div>\n`;
+          stack.pop();
+          break;
+        case 'SP':
+        case 'sp':
+          // Vertical space
+          html += `<br class="${macro}"/>`;
+          break;
+        case 'SH':
+          // Already handled above
+          break;
+        case 'TI': // title end (ignore)
+        case 'TH':
+        case '\"':
+          break;
         default:
-          // ignore backslash if not recognized
-          out += next;
-          i++;
+          // Catch-all: treat unknown macro as a div or skip
+          // (Many technical macros like .nr, .ds, .if, .de are skipped)
+          html += macro // TODO
+          break;
       }
     } else {
-      out += text[i];
+      // No leading dot: normal text or continuation.
+      html += line + " ";
     }
-  }
-  return out;
-}
-
-// ---- Handle .BR / .RB font alternation ----
-function fontAlternation(args, order) {
-  const parts = args.trim().split(/\s+/);
-  const frag = document.createDocumentFragment();
-  parts.forEach((p,i) => {
-    const span = document.createElement(order[i % order.length] === "B" ? "strong" : "span");
-    if (order[i % order.length] === "R") span.style.fontStyle = "normal";
-    span.textContent = processTroffEscapes(p) + " ";
-    frag.appendChild(span);
-  });
-  return frag;
-}
-
-// --- Parser ---
-function parseAndRender(tokens, container) {
-  let currentParagraph = null;
-  let currentDl = null;
-  let inPre = false;
-
-  function closeParagraph() {
-    if (currentParagraph) {
-      container.appendChild(currentParagraph);
-      currentParagraph = null;
+    // Ensure paragraphs and items are closed if needed:
+    if (/^(?:\.(?:PP|LP|HP|P))/i.test(rawLine)) {
+      html += `</p>\n`;
+    }
+    if (/^(?:\.(?:It|IP))/i.test(rawLine)) {
+      html += `</li>\n`;
     }
   }
 
-  tokens.forEach(tok => {
-    
-    if (tok.type === "comment") return;
+  // Close any unclosed lists/sections
+  while (stack.length) {
+    let tag = stack.pop();
+    if (tag === 'ul') html += `</ul>\n`;
+    else if (tag === 'ol') html += `</ol>\n`;
+    else if (tag === 'dl') html += `</dl>\n`;
+    else if (tag === 'a') html += `</a>`;
+    else if (tag === 'blockquote') html += `</blockquote>\n`;
+    else if (tag === 'EX' || tag === 'nf') html += `</pre>\n`;
+    else html += `</${tag}>\n`;
+  }
 
-    if (tok.type === "macro") {
-
-      closeParagraph();
-      
-      const { name, args } = tok;
-
-      // Verbatim toggles
-      if (name === "nf") {
-        verbatim = true;
-        container.appendChild(Object.assign(document.createElement("pre"), { textContent: "" }));
-        return;
-      }
-      if (name === "fi") {
-        inPre = false;
-        return;
-      }
-      if (inPre) {
-        container.lastElementChild.textContent += args + "\n";
-        return;
-      }
-
-      switch(name) {
-        case "TH":
-        case "SH":
-        case "SS": {
-          const h = document.createElement(({TH: "h1", SH: "h2", SS: "h3"})[name]);
-          h.textContent = processTroffEscapes(args);
-          container.appendChild(h);
-        } break;
-
-        case "PP":
-        case "LP": {
-          currentParagraph = document.createElement("p");
-        } break;
-
-        case "TP":
-        case "TQ": {
-          if (!currentDl) {
-            currentDl = document.createElement("dl");
-            container.appendChild(currentDl);
-          }
-        } break;
-        
-        case "IP": {
-          if (currentDl) {
-            const dt = document.createElement("dt");
-            dt.textContent = processTroffEscapes(args);
-            currentDl.appendChild(dt);
-            const dd = document.createElement("dd");
-            currentDl.appendChild(dd);
-          }
-        } break;
-
-        case "BR":
-          closeParagraph();
-          container.appendChild(fontAlternation(args, ["B","R"]));
-        break;
-
-        case "RB":
-          closeParagraph();
-          container.appendChild(fontAlternation(args, ["R","B"]));
-        break;
-        
-        default: {
-          if(args.trim() !== "") {
-            // unhandled macro → clickable:
-            const cue = document.createElement("span");
-            cue.classList.add('troff-macro-unknown')
-            cue.textContent = "⧉";  // U+29C9 TWO JOINED SQUARES
-            cue.setAttribute('onclick', 'this.classList.toggle("expanded")');
-            container.appendChild(cue);
-  
-            const detail = document.createElement("span");
-            detail.textContent = `.${name} ${args}`;
-            cue.appendChild(detail);
-          }
-        }
-      }
-    }
-    else if (tok.type === "text") {
-      if (!currentParagraph) {
-        currentParagraph = document.createElement("p");
-      }
-      currentParagraph.textContent += processTroffEscapes(tok.text) + "\n";
-    }
-  });
-  
-  closeParagraph();
+  return html;
 }
 
 
@@ -183,8 +232,5 @@ export async function renderMan(text) {
   return html;
   */
 
-  const tokens = tokenize(text)
-  const rendered = document.createElement('DIV')
-  parseAndRender(tokens, rendered)
-  return rendered.innerHTML
+  return parseTroff(text)
 }
