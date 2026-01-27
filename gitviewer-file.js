@@ -39,6 +39,7 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
   // handle rendering
   const container = $('dumbgitviewerFile')
   clear(container)
+  if (container.shadowRoot) container.shadowRoot.innerHTML = ''
   $('dumbgitviewerFile').dataset.format = ''
   $('fileFormatSwitcher').style.display = 'none'  /* always hide for non-text contents */
   
@@ -84,6 +85,9 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
     }
     else if (finalFileFormat == 'man') {
       container.innerHTML = await renderMan(new TextDecoder().decode(body))
+      // attach shadow DOM to apply the stylesheet only to this section
+      if (!container.shadowRoot) container.attachShadow({ mode: 'open' });
+      container.shadowRoot.innerHTML = '<link rel="stylesheet" href="troff.css">  <slot></slot>';
     }
     else {
       // raw plain text
