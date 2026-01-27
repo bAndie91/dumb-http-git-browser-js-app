@@ -9,9 +9,6 @@ let enable_escpe_char = true
 
 
 const inlineEscapeSequences = {
-  'e': '\\',
-  '(rs': '\\',
-  '[rs]': '\\',
   '&': '',
   '*': (x) => troff_string[x],
   'n': (x) => troff_register[x],
@@ -25,9 +22,107 @@ const inlineEscapeSequences = {
 }
 
 
+function resolve_escape(name, param) {
+  if(name == '"' || name == '#') TODO
+  const r = ({
+    '´':  '´',
+    'aa': '´',
+    '`':  '`',
+    'ga': '`',
+    '-':  '-',
+    '_':  '_',
+    '.':  '.',
+    '%':  '&shy;',
+    '!':  '',  // Transparent line indicator - TODO
+    '?':  '',  // TODO
+    ' ':  '&nbsp;',
+    '0':  '&nbsp;',
+    '|':  '<span class="sixth-space"></span>',
+    '^':  '<span class="twelfth-space"></span>',
+    '&':  '',
+    ')':  '',
+    '/':  '',  // not implemented
+    ',':  '',  // not implemented
+    '~':  '&nbsp;',
+    ':':  '&zwnj;',
+    '{':  '',  // not implemented
+    '}':  '',  // not implemented
+    'e':  '\\',
+    '\\': '\\',
+    
+    'Do': '$',
+    'Eu': '€',
+    'Po': '£',
+    'aq': "'",
+    'bu': '•',
+    'co': '©',
+    'cq': '’',
+    'ct': '¢',
+    'dd': '‡',
+    'de': '°',
+    'dg': '†',
+    'dq': '"',
+    'em': '—',
+    'en': '–',
+    'hy': '‐',
+    'lq': '“',
+    'oq': '‘',
+    'rg': '®',
+    'rq': '”',
+    'rs': '\\',
+    'sc': '§',
+    'tm': '™',
+    'ul': '_',
+    '==': '≡',
+    '>=': '≥',
+    '<=': '≤',
+    '!=': '≠',
+    '->': '→',
+    '<-': '←',
+    '+-': '±',
+  })[name];
+  if(r !== undefined) return r  
+  if(name.length == 1) return name  /* If  a backslash is followed by a character that does not constitute a defined escape sequence, the backslash is silently ignored and the character maps to itself. */
+}
+function unescape_cb(match, group, pos) {
+  if(let m = group.match(/^\*(\((.+)|\[(.+)\]|(.+))/)) {
+    /*
+    this supposed to cover these cases:
+       \*s    The string stored in the string variable with one-character name s.
+       \*(st  The string stored in the string variable with two-character name st.
+       \*[string]
+              The string stored in the string variable with name string (with arbitrary length).
+    TODO:
+       \*[stringvar arg1 arg2 ...]
+              The string stored in the string variable with arbitrarily long name stringvar, taking arg1, arg2, ... as arguments.          
+    */
+    let stringvar = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : m[4])
+    return troff_string[stringvar]
+  }
+  if(group == '') {
+    /* escape was at the end of line */
+    line_continuation = true
+    return ''
+  }
+  
+  let name = ''
+  let param = ''
+  
+  if(let m = group.match(/^\[(.+)/)) {
+    name = m[1]
+  }
+  else if(let m = group.match(/^\((..)/)) {
+    name = m[1]
+  }
+  else {
+    let m = group.match(/(.)(.*)/)
+    name = m[1]
+    param = m[2]
+  }
+  return resolve_escape(name, param)
+}
 function unescapeLine(line) {
-  // /\((..)/
-  // /\[(.+)\]/
+  return line.replace(/\\(\*?\[.+?\]|\*?\(..|[eE]|[fF].|$)/g, unescape_cb)
 }
 
 
@@ -47,6 +142,7 @@ const fill_color_stack = []
 const indention_stack = []
 let enable_fill = false
 let nospace_mode = false
+let line_continuation = false
 
 
 const macros = {

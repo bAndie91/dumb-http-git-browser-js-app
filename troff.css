@@ -1,4 +1,4 @@
-div.vertical-spacer {
+.vertical-spacer {
   line-height: 1;
   height: 1em;
 }
@@ -15,3 +15,15 @@ div.vertical-spacer {
 .threepart-title.part1 { justify-self: start; }
 .threepart-title.part2 { justify-self: center; text-align: center; }
 .threepart-title.part3 { justify-self: end; }
+
+.sixth-space, .twelfth-space {
+  display: inline-block;
+  height: 0;
+  vertical-align: baseline;
+}
+.sixth-space {
+  width: 0.1667em;
+}
+.twelfth-space {
+  width: 0.0833em;
+}
