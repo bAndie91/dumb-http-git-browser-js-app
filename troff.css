@@ -1,0 +1,17 @@
+div.vertical-spacer {
+  line-height: 1;
+  height: 1em;
+}
+
+.underline {
+  text-decoration: underline;
+}
+
+.threepart-title {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: baseline;
+}
+.threepart-title.part1 { justify-self: start; }
+.threepart-title.part2 { justify-self: center; text-align: center; }
+.threepart-title.part3 { justify-self: end; }
