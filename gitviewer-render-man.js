@@ -41,14 +41,15 @@ function resolve_escape(name, param) {
     '^':  '<span class="twelfth-space"></span>',
     '&':  '',
     ')':  '',
-    '/':  '',  // not implemented
-    ',':  '',  // not implemented
+    '/':  '',  // not_implemented
+    ',':  '',  // not_implemented
     '~':  '&nbsp;',
     ':':  '&zwnj;',
-    '{':  '',  // not implemented
-    '}':  '',  // not implemented
+    '{':  '',  // not_implemented
+    '}':  '',  // not_implemented
     'e':  '\\',
     '\\': '\\',
+    'a':  '',  // not_implemented // Non-interpreted leader character.
     
     'Do': '$',
     'Eu': '€',
@@ -122,7 +123,7 @@ function unescape_cb(match, group, pos) {
   return resolve_escape(name, param)
 }
 function unescapeLine(line) {
-  return line.replace(/\\(\*?\[.+?\]|\*?\(..|[eE]|[fF].|$)/g, unescape_cb)
+  return line.replace(/\\(\*?\[.+?\]|\*?\(..|[acdeEprtu]|[fFgkmMnsVY]\(..|[fFgkmMnsVY]\[.*?\]|[AbBCDhHlLNoRsSvwxXZ]'.*?'|[fFgkmMnOsVYz].|$)/g, unescape_cb)
 }
 
 
