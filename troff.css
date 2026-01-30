@@ -27,3 +27,79 @@
 .twelfth-space {
   width: 0.0833em;
 }
+
+.Bd, .Bl {
+  display: block;
+  margin-top: 6pt;
+}
+.Bd-centered {
+  text-align: center;
+}
+.Bd-filled {
+  text-align: justify;
+}
+.Bd-literal {
+  white-space: pre;
+  font-family: monospace;
+}
+.Bd-unfilled {
+  white-space: pre;
+}
+.Bd-ragged {
+  text-align: left;
+  /* TODO remove hard line breaks to reflow */
+}
+.offset-indent {
+	margin-left: 6em;
+}
+.offset-indent-two {
+	margin-left: 12em;
+}
+.offset-left {
+}
+.offset-right {
+  text-align: right;
+}
+.offset-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+.compact {
+  margin-top: 0;
+}
+
+.Bl-bullet {
+  list-style-type: disc;
+}
+.Bl-column {
+  list-style-type: none;
+}
+.Bl-dash, .Bl-hyphen {
+  list-style-type: '– ';
+}
+.Bl-inset, .Bl-diag {
+  list-style-type: none;
+}
+.Bl-enum {
+  list-style-type: decimal;
+}
+.Bl-item {
+  padding-inline-start: 0;
+}
+.Bl-tag, .Bl-hang, .Bl-ohang  {
+  list-style-type: none;
+  text-indent: -40px;  /* default UL > LI margin-left */
+}
+
+.kernel-config-declaration {
+  white-space: pre;
+  font-family: monospace;
+}
+
+.D1 {
+  padding-inline-start: 1em;
+}
+.Dl {
+  white-space: pre;
+  font-family: monospace;
+}

@@ -8,22 +8,9 @@ let escape_char_saved = escape_char
 let enable_escpe_char = true
 
 
-const inlineEscapeSequences = {
-  '&': '',
-  '*': (x) => troff_string[x],
-  'n': (x) => troff_register[x],
-  'cq': "'",
-  'dq': '"',
-  // hard spaces
-//  ' '
-//  '|'
-//  '^'
-//  'h'
-}
-
-
 function resolve_escape(name, param) {
-  if(name == '"' || name == '#') TODO
+  if(name == '"' || name == '#') // TODO
+  
   const r = ({
     '´':  '´',
     'aa': '´',
@@ -33,12 +20,12 @@ function resolve_escape(name, param) {
     '_':  '_',
     '.':  '.',
     '%':  '&shy;',
-    '!':  '',  // Transparent line indicator - TODO
-    '?':  '',  // TODO
+    '!':  '',  // not_implemented // Transparent line indicator
+    '?':  '',  // not_implemented
     ' ':  '&nbsp;',
     '0':  '&nbsp;',
-    '|':  '<span class="sixth-space"></span>',
-    '^':  '<span class="twelfth-space"></span>',
+    '|':  '<span class="sixth-space"> </span>',
+    '^':  '<span class="twelfth-space"> </span>',
     '&':  '',
     ')':  '',
     '/':  '',  // not_implemented
@@ -47,14 +34,46 @@ function resolve_escape(name, param) {
     ':':  '&zwnj;',
     '{':  '',  // not_implemented
     '}':  '',  // not_implemented
-    'e':  '\\',
     '\\': '\\',
     'a':  '',  // not_implemented // Non-interpreted leader character.
-    
+    'A':  '',  // not_implemented
+    'b':  '',  // not_implemented
+    'B':  '',  // not_implemented
+    'c':  '',  // not_implemented
+    'C':  '',  // not_implemented
+    'd':  '',  // not_implemented
+    'D':  '',  // not_implemented
+    'e':  '\\',
+    'E':  '\\',
+    'g':  '',  // not_implemented
+    'H':  '',  // not_implemented
+    'k':  '',  // not_implemented
+    'l':  '',  // not_implemented
+    'L':  '',  // not_implemented
+    'm':  '',  // not_implemented
+    'M':  '',  // not_implemented
+    'N':  '',  // not_implemented
+    'o':  '',  // not_implemented
+    'O':  '',  // not_implemented
+    'p':  '',  // not_implemented
+    'r':  '',  // not_implemented
+    'R':  '',  // not_implemented
+    's':  '',  // not_implemented
+    'S':  '',  // not_implemented
+    't':  '<span class="horizontal-tab"></span>',
+    'u':  '',  // not_implemented
+    'v':  '',  // not_implemented
+    'V':  '',  // not_implemented
+    'w':  '',  // not_implemented
+    'x':  '',  // not_implemented
+    'X':  '',  // not_implemented
+    'Y':  '',  // not_implemented
+    'z':  '',  // not_implemented
+    'Z':  '',  // not_implemented
     'Do': '$',
     'Eu': '€',
     'Po': '£',
-    'aq': "'",
+    'aq': "&apos;",
     'bu': '•',
     'co': '©',
     'cq': '’',
@@ -62,7 +81,7 @@ function resolve_escape(name, param) {
     'dd': '‡',
     'de': '°',
     'dg': '†',
-    'dq': '"',
+    'dq': '&quot;',
     'em': '—',
     'en': '–',
     'hy': '‐',
@@ -83,47 +102,37 @@ function resolve_escape(name, param) {
     '+-': '±',
   })[name];
   if(r !== undefined) return r  
+  
+  if(name == '*') return escapeHtml(troff_string[param]);
+  if(name == 'n') return escapeHtml(troff_register[param]);
+  if(name == 'f') // TODO change font
+  if(name == 'F') // TODO change font family
+  if(name == 'h') /* Local horizontal motion; move right N (left if negative). */ return ' '.repeat(param || 1);
+  
   if(name.length == 1) return name  /* If  a backslash is followed by a character that does not constitute a defined escape sequence, the backslash is silently ignored and the character maps to itself. */
+  
+  if(let m = name.match(/^u([a-zA-Z0-9]+)$/)) {
+    /* unicode char */
+    return `&#x${m[1]};`;
+  }
+  
+  return `<span class="unknown-escape-code escape-code-${name}">&#xFFFD;</span>`
 }
 function unescape_cb(match, group, pos) {
-  if(let m = group.match(/^\*(\((.+)|\[(.+)\]|(.+))/)) {
-    /*
-    this supposed to cover these cases:
-       \*s    The string stored in the string variable with one-character name s.
-       \*(st  The string stored in the string variable with two-character name st.
-       \*[string]
-              The string stored in the string variable with name string (with arbitrary length).
-    TODO:
-       \*[stringvar arg1 arg2 ...]
-              The string stored in the string variable with arbitrarily long name stringvar, taking arg1, arg2, ... as arguments.          
-    */
-    let stringvar = m[2] !== undefined ? m[2] : (m[3] !== undefined ? m[3] : m[4])
-    return troff_string[stringvar]
+  if(let m = group.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)) {
+    let name = m[1]
+    let param = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : m[5])
+    return resolve_escape(name, param)
   }
   if(group == '') {
     /* escape was at the end of line */
     line_continuation = true
     return ''
   }
-  
-  let name = ''
-  let param = ''
-  
-  if(let m = group.match(/^\[(.+)/)) {
-    name = m[1]
-  }
-  else if(let m = group.match(/^\((..)/)) {
-    name = m[1]
-  }
-  else {
-    let m = group.match(/(.)(.*)/)
-    name = m[1]
-    param = m[2]
-  }
-  return resolve_escape(name, param)
+  throw new Error(`don't know how to unescape: ${group}`)
 }
 function unescapeLine(line) {
-  return line.replace(/\\(\*?\[.+?\]|\*?\(..|[acdeEprtu]|[fFgkmMnsVY]\(..|[fFgkmMnsVY]\[.*?\]|[AbBCDhHlLNoRsSvwxXZ]'.*?'|[fFgkmMnOsVYz].|$)/g, unescape_cb)
+  return line.replace(/\\([acdeEprtu]|[fFgkmMnsVY\*]\(..|[fFgkmMnsVY\*]\[.*?\]|[AbBCDhHlLNoRsSvwxXZ]'.*?'|[fFgkmMnOsVYz].|.|$)/g, unescape_cb)
 }
 
 
@@ -144,9 +153,15 @@ const indention_stack = []
 let enable_fill = false
 let nospace_mode = false
 let line_continuation = false
+let mdoc_author_mode = 'nosplit'
+const mdoc_Eo_stack = []
+let mdoc_Es_delimiters = ['', '']
+let mdoc_Nm = ''
 
 
 const macros = {
+  /* groff macros (control commands) */
+  
   ab: function(arg, args) {
     // .ab string
     // Print string on standard error, exit program.
@@ -595,7 +610,7 @@ const macros = {
     let lines = arg.length == 0 ? 1 : arg[0]
     if(lines < 0) { console.log(`.sp: ${lines} negative lines count is not supported`); return; }
     let html = '';
-    for(let i = 0; i < arg[0] || 1; i++) { html += '<div class="vertical-spacer"></div>' }
+    html += '<div class="vertical-spacer"></div>'.repeat(arg[0] || 1)
     return { 'html': html }
   },
 /*
@@ -630,7 +645,7 @@ const macros = {
     //   .tl ’left’center’right’
     //             Three-part title.
     let delim = args.substr(0, 1)
-    let part = args.substr(1).split(delim).map((x) => escapeHtml(x))
+    let part = args.substr(1).split(delim).map((x) => unescapeLine(x))
     return { html: `<div class="treepart-title"><span class="part1">${part[0]}</span><span class="part2">${part[1]}</span><span class="part3">${part[2]}</span></div>` }
   },
 /*
@@ -678,6 +693,106 @@ const macros = {
        .writem stream xx
                  Write contents of macro or string xx to the stream named stream.
 */
+
+  /* mdoc macros */
+  '%A': (arg, raw_args, html_args) => `<span class="author-name">${html_args}</span>`,
+  '%B': (arg, raw_args, html_args) => `<span class="book-title">${html_args}</span>`,
+  '%C': (arg, raw_args, html_args) => `<span class="publication-location">${html_args}</span>`,
+  '%D': (arg, raw_args, html_args) => `<span class="publication-date">${html_args}</span>`,
+  '%I': (arg, raw_args, html_args) => `<span class="issuer-name">${html_args}</span>`,
+  '%J': (arg, raw_args, html_args) => `<span class="journal-name">${html_args}</span>`,
+  '%N': (arg, raw_args, html_args) => `<span class="issue-number">${html_args}</span>`,
+  '%O': (arg, raw_args, html_args) => `<span class="optional-info">${html_args}</span>`,
+  '%P': (arg, raw_args, html_args) => `<span class="page-number">${html_args}</span>`,
+  '%Q': (arg, raw_args, html_args) => `<span class="institution-name">${html_args}</span>`,
+  '%R': (arg, raw_args, html_args) => `<span class="technical-report-name">${html_args}</span>`,
+  '%T': (arg, raw_args, html_args) => `<span class="artical-title">${html_args}</span>`,
+  '%U': (arg, raw_args, html_args) => `<a class="reference-document" href="${escapeHtml(raw_args)}">${html_args}</a>`,
+  '%V': (arg, raw_args, html_args) => `<span class="volume-number">${html_args}</span>`,
+  'Ac': () => "&gt;",
+  'Ad': (arg, raw_args, html_args) => `<span class="memory-address">${html_args}</span>`,
+  'An': (arg, raw_args, html_args) => {
+    if(let m = raw_args.match(/^-(.*)/)) {
+      mdoc_author_mode = m[1]
+      return ''
+    }
+    else {
+      return `<span class="author-name">${html_args}</span>`
+    }
+  },
+  'Ao': (arg, raw_args, html_args) => `&lt;${html_args}`,
+  'Ap': () => '&apos;',
+  'Aq': (arg, raw_args, html_args) => `&lt;${html_args}&gt;`,
+  'Ar': (arg, raw_args, html_args) => {
+    if(html_args == '') html_args = "file ..."
+    return `<span class="command-argument">${html_args}</span>`
+  },
+  'At': (arg, raw_args, html_args) => {
+     if(raw_args.match(/v[1-7]|32v/)) return { plaintext: "A version of AT&T UNIX." }
+     if(raw_args.match(/III/))        return { plaintext: "AT&T System III UNIX." }
+     if(raw_args.match(/V|V\.[1-4]))  return { plaintext: "A version of AT&T System V UNIX." }
+     return { html: `<!-- .At ${escapeHtml(raw_args)} -->` }
+  },
+  'Bc': () => "]",
+  'Bd': (arg, raw_args, html_args) => {
+    const classes = [ `Bd${arg[0]}` ]
+    if(arg[1] == '-offset') classes.append(`offset-${arg[2]}`)
+    if('-compact' in arg) classes.append(`compact`)
+    return { open: 'div', classes }
+  },
+  // 'Bf': () => '',
+  // 'Bk': () => '',
+  'Bl': (arg, raw_args, html_args) => {
+    const classes = [ `Bl${arg[0]}` ]
+    for(let i = 1; i < arg.length-1; i++) {
+      if(arg[i] == '-offset') classes.append(`offset-${arg[i+1]}`)
+      // TODO [-width val]
+    }
+    if('-compact' in arg) classes.append(`compact`)
+    return { open: 'ul', classes }
+  },
+  'Bo': (arg, raw_args, html_args) => `[${html_args}`,
+  'Bq': (arg, raw_args, html_args) => `[${html_args}]`,
+  'Brc': () => "}",
+  'Bro': (arg, raw_args, html_args) => `{${html_args}`,
+  'Brq': (arg, raw_args, html_args) => `{${html_args}}`,
+  'Bsx': (arg, raw_args, html_args) => `<span class="BSDOS-version">${html_args || "&#xFFFD;"}</span>`,
+  'Bt': () => "is currently in beta test.",
+  'Bx': (arg, raw_args, html_args) => `<span class="BSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Cd': (arg, raw_args, html_args) => `<span class="kernel-config-declaration">${html_args}</span>`,
+  'Cm': (arg, raw_args, html_args) => `<span class="command-modifier">${html_args}</span>`,
+  'D1': (arg, raw_args, html_args) => `<div class="D1">${html_args}</div>`,
+  'Db': () => '',
+  'Dc': () => "&quot;",
+  'Dd': (arg, raw_args, html_args) => `<span class="document-date">${html_args || "&#xFFFD;"}</span>`,
+  'Dl': (arg, raw_args, html_args) => `<div class="Dl">${html_args}</div>`,
+  'Do': (arg, raw_args, html_args) => `&quot;${html_args}`,
+  'Dq': (arg, raw_args, html_args) => `<q>${html_args}</q>`,
+  'Dt': (arg, raw_args, html_args) => `<h1>${html_args}</h1>`,  // TODO probably need to separate arguments: .Dt TITLE section [arch]
+  // Dv
+  'Dx': (arg, raw_args, html_args) => `<span class="Dragonfly-version">${html_args || "&#xFFFD;"}</span>`,
+  'Ec': (arg, raw_args, html_args) => {
+    let closing_delimiter = mdoc_Eo_stack.pop()
+    if(html_args !== '') closing_delimiter = html_args
+    else closing_delimiter = unescapeLine(closing_delimiter)
+    return escapeHtml(closing_delimiter)
+  },
+  'Ed': () => { close: 'div' },
+  // 'Ef':
+  // Ek
+  'El': () => { close: 'ul' },
+  'Em': (arg, raw_args, html_args) => `<em>${html_args}</em>`,
+  'En': (arg, raw_args, html_args) => `${mdoc_Es_delimiters[0]}${html_args}${mdoc_Es_delimiters[1]}`,
+  'Eo': (arg, raw_args, html_args) => {
+    mdoc_Eo_stack.push(raw_args)
+    return html_args
+  },
+  'Er': (arg, raw_args, html_args) => `<span class="error-constant">${html_args}</span>`,
+  'Es': (arg, raw_args, html_args) => {
+    mdoc_Es_delimiters = arg
+  },
+  'Ev': (arg, raw_args, html_args) => `<span class="environment-variable">${html_args}</span>`,
+  'Ex': (arg, raw_args, html_args) => `The ${html_args[1] || mdoc_Nm} utility exits 0 on success, and >0 if an error occurs.`,
 }
 
 export function renderMan(troffText) {
@@ -693,12 +808,30 @@ export function renderMan(troffText) {
         // comment
         continue
       }
-      let args = match[3] === undefined ? '' : match[3]
-      let arg = args.split(/\s+/)  // TODO what is the correct tokenization here?
+      let raw_args = match[3] === undefined ? '' : match[3]
+      let arg = raw_args.split(/\s+/)  // TODO what is the correct tokenization here?
       if(macro in macros) {
-        macro_result = macros[macro](arg, args)
-        if('html' in macro_result) {
-          html += macro_result.html
+        macro_result = macros[macro](arg, raw_args, unescapeLine(raw_args))
+        if(macro_result === undefined) {
+          continue
+        }
+        if(typeof macro_result == 'string') {
+          html += macro_result
+        }
+        else {
+          if('html' in macro_result) {
+            html += macro_result.html
+          }
+          else if('plaintext' in macro_result) {
+            html += escapeHtml(macro_result.plaintext)
+          }
+          if('close' in macro_result) {
+            html += `</${macro_result.close}>`
+          }
+          if('open' in macro_result && !('html' in macro_result)) {
+            const classes = 'classes' in macro_result ? macro_result.classes : []
+            html += `<${macro_result.open} class="${macro} ${classes.join(' ')}">`
+          }
         }
       }
       else {
@@ -707,9 +840,9 @@ export function renderMan(troffText) {
     }
     else {
       // plain text
-      // TODO center_lines
-      html += escapeHtml(line) + ' '
-      // TODO tab positions
+      html += unescapeLine(line)
+      if(!line_continuation) html += ' '
+      line_continuation = false
     }
   }
   return html;
