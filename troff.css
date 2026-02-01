@@ -81,7 +81,8 @@
   list-style-type: none;
 }
 .Bl-enum {
-  list-style-type: decimal;
+  /* no need, ".Bl -enum" will be <OL> lists anyway */
+  /* list-style-type: decimal; */
 }
 .Bl-item {
   padding-inline-start: 0;
@@ -99,7 +100,14 @@
 .D1 {
   padding-inline-start: 1em;
 }
-.Dl {
+.Dl, .Ql, .Qo {
   white-space: pre;
   font-family: monospace;
+}
+.Li {
+  font-family: monospace;
+}
+
+.Tn {
+  font-variant: small-caps;
 }

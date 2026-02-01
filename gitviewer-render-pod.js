@@ -1,5 +1,5 @@
 
-import { escapeHtml } from './gitviewer-util.js';
+import { escapeHtml, slugify } from './gitviewer-util.js';
 
 export function renderPOD(fileContent) {
    // POD documentation can start implicitly or with =pod
@@ -133,15 +133,6 @@ export function renderPOD(fileContent) {
                resumeLists();
            }
        }
-   }
-
-   function slugify(text) {
-       return text.toLowerCase()
-           .replace(/<[^>]+>/g, '')
-           .replace(/[^\w\s-]/g, '')
-           .replace(/\s+/g, '-')
-           .replace(/-+/g, '-')
-           .trim();
    }
 
    function processEntity(entity) {

@@ -156,7 +156,10 @@ let line_continuation = false
 let mdoc_author_mode = 'nosplit'
 const mdoc_Eo_stack = []
 let mdoc_Es_delimiters = ['', '']
-let mdoc_Nm = ''
+let mdoc_Nm = undefined
+let mdoc_current_section = ''
+const mdoc_list_stack = []
+let mdoc_spacing_mode = true
 
 
 const macros = {
@@ -709,7 +712,7 @@ const macros = {
   '%T': (arg, raw_args, html_args) => `<span class="artical-title">${html_args}</span>`,
   '%U': (arg, raw_args, html_args) => `<a class="reference-document" href="${escapeHtml(raw_args)}">${html_args}</a>`,
   '%V': (arg, raw_args, html_args) => `<span class="volume-number">${html_args}</span>`,
-  'Ac': () => "&gt;",
+  'Ac': () => "&gt;</div>",
   'Ad': (arg, raw_args, html_args) => `<span class="memory-address">${html_args}</span>`,
   'An': (arg, raw_args, html_args) => {
     if(let m = raw_args.match(/^-(.*)/)) {
@@ -720,20 +723,20 @@ const macros = {
       return `<span class="author-name">${html_args}</span>`
     }
   },
-  'Ao': (arg, raw_args, html_args) => `&lt;${html_args}`,
+  'Ao': (arg, raw_args, html_args) => `<div class="Ao">&lt;${html_args}`,
   'Ap': () => '&apos;',
-  'Aq': (arg, raw_args, html_args) => `&lt;${html_args}&gt;`,
+  'Aq': (arg, raw_args, html_args) => `<span class="Aq">&lt;${html_args}&gt;</span>`,
   'Ar': (arg, raw_args, html_args) => {
     if(html_args == '') html_args = "file ..."
-    return `<span class="command-argument">${html_args}</span>`
+    return `<span class="command-argument Ar">${html_args}</span>`
   },
   'At': (arg, raw_args, html_args) => {
-     if(raw_args.match(/v[1-7]|32v/)) return { plaintext: "A version of AT&T UNIX." }
-     if(raw_args.match(/III/))        return { plaintext: "AT&T System III UNIX." }
-     if(raw_args.match(/V|V\.[1-4]))  return { plaintext: "A version of AT&T System V UNIX." }
-     return { html: `<!-- .At ${escapeHtml(raw_args)} -->` }
+     if(raw_args.match(/v[1-7]|32v/)) return { plaintext: `${raw_args} version of AT&T UNIX` }
+     if(raw_args.match(/III/))        return { plaintext: "AT&T System III UNIX" }
+     if(raw_args.match(/V|V\.[1-4]))  return { plaintext: `${raw_args} version of AT&T System V UNIX` }
+     return ""
   },
-  'Bc': () => "]",
+  'Bc': () => "]</div>",
   'Bd': (arg, raw_args, html_args) => {
     const classes = [ `Bd${arg[0]}` ]
     if(arg[1] == '-offset') classes.append(`offset-${arg[2]}`)
@@ -743,30 +746,33 @@ const macros = {
   // 'Bf': () => '',
   // 'Bk': () => '',
   'Bl': (arg, raw_args, html_args) => {
+    let tag = 'ul'
     const classes = [ `Bl${arg[0]}` ]
     for(let i = 1; i < arg.length-1; i++) {
       if(arg[i] == '-offset') classes.append(`offset-${arg[i+1]}`)
       // TODO [-width val]
     }
     if('-compact' in arg) classes.append(`compact`)
-    return { open: 'ul', classes }
+    if('-enum' in arg) tag = 'ol'
+    mdoc_list_stack.append(tag)
+    return { open: tag, classes }
   },
-  'Bo': (arg, raw_args, html_args) => `[${html_args}`,
-  'Bq': (arg, raw_args, html_args) => `[${html_args}]`,
-  'Brc': () => "}",
-  'Bro': (arg, raw_args, html_args) => `{${html_args}`,
-  'Brq': (arg, raw_args, html_args) => `{${html_args}}`,
+  'Bo': (arg, raw_args, html_args) => `<div class="Bo">[${html_args}`,
+  'Bq': (arg, raw_args, html_args) => `<span class="Bq">[${html_args}]</span>`,
+  'Brc': () => "}</div>",
+  'Bro': (arg, raw_args, html_args) => `<div class="Bro">{${html_args}`,
+  'Brq': (arg, raw_args, html_args) => `<span class="Brq">{${html_args}}</span>`,
   'Bsx': (arg, raw_args, html_args) => `<span class="BSDOS-version">${html_args || "&#xFFFD;"}</span>`,
   'Bt': () => "is currently in beta test.",
   'Bx': (arg, raw_args, html_args) => `<span class="BSD-version">${html_args || "&#xFFFD;"}</span>`,
-  'Cd': (arg, raw_args, html_args) => `<span class="kernel-config-declaration">${html_args}</span>`,
-  'Cm': (arg, raw_args, html_args) => `<span class="command-modifier">${html_args}</span>`,
+  'Cd': (arg, raw_args, html_args) => `<span class="kernel-config-declaration Cd">${html_args}</span>`,
+  'Cm': (arg, raw_args, html_args) => `<span class="command-modifier Cm">${html_args}</span>`,
   'D1': (arg, raw_args, html_args) => `<div class="D1">${html_args}</div>`,
   'Db': () => '',
-  'Dc': () => "&quot;",
-  'Dd': (arg, raw_args, html_args) => `<span class="document-date">${html_args || "&#xFFFD;"}</span>`,
+  'Dc': () => "&quot;</div>",
+  'Dd': (arg, raw_args, html_args) => `<span class="document-date Dd">${html_args || "&#xFFFD;"}</span>`,
   'Dl': (arg, raw_args, html_args) => `<div class="Dl">${html_args}</div>`,
-  'Do': (arg, raw_args, html_args) => `&quot;${html_args}`,
+  'Do': (arg, raw_args, html_args) => `<div class="Do">&quot;${html_args}`,
   'Dq': (arg, raw_args, html_args) => `<q>${html_args}</q>`,
   'Dt': (arg, raw_args, html_args) => `<h1>${html_args}</h1>`,  // TODO probably need to separate arguments: .Dt TITLE section [arch]
   // Dv
@@ -780,23 +786,176 @@ const macros = {
   'Ed': () => { close: 'div' },
   // 'Ef':
   // Ek
-  'El': () => { close: 'ul' },
-  'Em': (arg, raw_args, html_args) => `<em>${html_args}</em>`,
+  'El': () => {
+    let html = ''
+    while(true) {
+      let prev_obj = mdoc_list_stack.pop()
+      if(prev_obj == 'li') html += '</li>'
+      else if(prev_obj in ['ul', 'ol']) { html += `</${prev_obj}>`; break; }
+    }
+    return { html }
+  },
+  'Em': (arg, raw_args, html_args) => `<em class="Em">${html_args}</em>`,
   'En': (arg, raw_args, html_args) => `${mdoc_Es_delimiters[0]}${html_args}${mdoc_Es_delimiters[1]}`,
   'Eo': (arg, raw_args, html_args) => {
     mdoc_Eo_stack.push(raw_args)
     return html_args
   },
-  'Er': (arg, raw_args, html_args) => `<span class="error-constant">${html_args}</span>`,
+  'Er': (arg, raw_args, html_args) => `<span class="error-constant Er">${html_args}</span>`,
   'Es': (arg, raw_args, html_args) => {
     mdoc_Es_delimiters = arg
   },
-  'Ev': (arg, raw_args, html_args) => `<span class="environment-variable">${html_args}</span>`,
-  'Ex': (arg, raw_args, html_args) => `The ${html_args[1] || mdoc_Nm} utility exits 0 on success, and >0 if an error occurs.`,
+  'Ev': (arg, raw_args, html_args) => `<span class="environment-variable Ev">${html_args}</span>`,
+  'Ex': (arg, raw_args, html_args) => `<span class="Ex">The ${unescapeLine(arg[1]) || mdoc_Nm} utility exits 0 on success, and &gt;0 if an error occurs.</span>`,
+  'Fa': (arg, raw_args, html_args) => arg.map((a) => `<span class="function-argument Fa">${unescapeLine(a)}</span>`).join(''),
+  'Fc': () => "</div>",
+  'Fd': (arg, raw_args, html_args) => `<span class="preprocessor-directive Fd">${html_args}</span>`,
+  'Fl': (arg, raw_args, html_args) => `<span class="commandline-flag Fl">-${html_args}</span>`,
+  'Fn': (arg, raw_args, html_args) => {
+    const fargs_html = arg.slice(1).map((a) => `<span class="function-argument Fn">${unescapeLine(a)}</span>`).join(' ')
+    return `<div class="Fn"><span class="function-name Fn">${unescapeLine(arg[0])}</span>(${fargs_html})</div>`
+  },
+  'Fo': (arg, raw_args, html_args) => `<div class="function-block Fo"><span class="function-name">${html_args}</span>`,
+  'Fr': (arg, raw_args, html_args) => `<i class="numerical-function-return-values Fr">${html_args}</i>`,
+  'Ft': (arg, raw_args, html_args) => `<div class="function-type Ft">${html_args}</div>`,
+  'Fx': (arg, raw_args, html_args) => `<span class="FreeBSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Hf': () => `<div class="Hf">&#xFFFD;</div>`,
+  'Ic': (arg, raw_args, html_args) => `<span class="internal-command Ic">${html_args || "&#xFFFD;"}</span>`,
+  'In': (arg, raw_args, html_args) => {
+    if(mdoc_current_section == 'SYNOPSIS') {
+      return `<div class="include-file In">#include &lt;${html_args || "&#xFFFD;"}&gt;</div>`
+    } else {
+      return `<span class="include-file In">&lt;${html_args || "&#xFFFD;"}&gt;</span>`
+    }
+  },
+  'It': (arg, raw_args, html_args) => {
+    let html = ''
+    let prev_obj = mdoc_list_stack.pop()
+    if(prev_obj == 'li') html += '</li>'
+    else mdoc_list_stack.push(prev_obj)
+    mdoc_list_stack.append('li')
+    html += `<li><span class="item-head">${html_args}</span>`
+    return { html }
+    // TODO take care of the ".Bl -column" type lists
+  },
+  // Lb
+  'Li': (arg, raw_args, html_args) => `<span class="Li">${html_args}</span>`,
+  'Lk': (arg, raw_args, html_args) => `<a href="${unescapeLine(arg[0])}" class="Lk">${unescapeLine(arg[1] || arg[0])}</a>`,
+  'Lp': () => { alias: 'Pp' },
+  'Ms': (arg) => `<span class="Ms">&${arg[0]};</span>`,  // most mathematical symbols work as html entity
+  'Mt': (arg, raw_args, html_args) => `<a href="mailto:${unescapeLine(arg[0])}" class="Mt">${unescapeLine(arg[0])}</a>`,
+  'Nd': (arg, raw_args, html_args) => `<span class="Nd">${html_args}</span>`,
+  'Nm': (arg, raw_args, html_args) => {
+    if(mdoc_Nm === undefined) mdoc_Nm = html_args
+    return `<span class="Nm">${mdoc_Nm}</span>`
+  },
+  'No': (arg, raw_args, html_args) => `<span class="No">${html_args}</span>`,
+  'Ns': (arg, raw_args, html_args) => `<span class="Ns">${html_args}</span>`,  // TODO no space
+  'Nx': (arg, raw_args, html_args) => `<span class="NetBSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Oc': () => "</div>",
+  'Oo': (arg, raw_args, html_args) => `<div class="Oo">${html_args}`,
+  'Op': (arg, raw_args, html_args) => `<span class="Op">[${html_args}]</span>`,
+  'Os': (arg, raw_args, html_args) => `<span class="Os">${html_args}</span>`,
+  'Ot': () => { alias: 'Ft' },
+  'Ox': (arg, raw_args, html_args) => `<span class="OpenBSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Pa': (arg, raw_args, html_args) => `<span class="filesystem-path Pa">${html_args || "~"}</span>`,
+  'Pc': () => ")</div>",
+  'Pf': (arg, raw_args, html_args) => `<span class="Pf">${unescapeLine(arg[0])}</span>`,  // TODO no space after
+  'Po': (arg, raw_args, html_args) => `<div class="Po">${html_args}`,
+  'Pp': () => ,  // TODO paragraph break or whatever block we are in
+  'Pq': (arg, raw_args, html_args) => `<div class="Pq">(${html_args}`,
+  'Qc': () => "</div>",
+  'Ql': (arg, raw_args, html_args) => `<span class="Ql">${html_args}</span>`,
+  'Qo': (arg, raw_args, html_args) => `<div class="Qo">${html_args}`,
+  'Qq': (arg, raw_args, html_args) => `&quot;${html_args}&quot;`,
+  'Re': () => '</div>',
+  'Rs': () => '<div class="bibliographic-reference Rs">',
+  'Rv': (arg, raw_args, html_args) => `<span class="Rv">The ${unescapeLine(arg[1]) || mdoc_Nm} function returns the value 0 if successful; otherwise the value -1 is returned and the global variable errno is set to indicate the error.</span>`,
+  'Sc': () => "&apos;</div>";
+  'Sh': (arg, raw_args, html_args) => {
+    mdoc_current_section = html_args
+    return `<h2><a name="${slugify(html_args)}">${html_args}</a></h2>`
+  },
+  'Sm': (arg) => {
+    mdoc_spacing_mode = (!arg[0]) ? (!mdoc_spacing_mode) : (arg[0] == 'on' ? true : false);
+  },
+  'So': (arg, raw_args, html_args) => `<div class="So">&apos;${html_args}`,
+  'Sq': (arg, raw_args, html_args) => `<span class="Sq">&apos;${html_args}&apos;</span>`,
+  'Ss': (arg, raw_args, html_args) => `<h3><a name="${slugify(html_args)}">${html_args}</a></h3>`,
+  'St': (arg) => {
+    const res = ({
+      '-ansiC': "ANSI X3.159-1989 (“ANSI C89”)",
+      '-ansiC-89': "ANSI X3.159-1989 (“ANSI C89”)",
+      '-isoC': "ISO/IEC 9899:1990 (“ISO C90”)",
+      '-isoC-90': "ISO/IEC 9899:1990 (“ISO C90”)",
+      '-isoC-amd1': "ISO/IEC 9899/AMD1:1995 (“ISO C90, Amendment 1”)",
+      '-isoC-tcor1': "ISO/IEC 9899/TCOR1:1994 (“ISO C90, Technical Corrigendum 1”)",
+      '-isoC-tcor2': "ISO/IEC 9899/TCOR2:1995 (“ISO C90, Technical Corrigendum 2”)",
+      '-isoC-99': "ISO/IEC 9899:1999 (“ISO C99”)",
+      '-isoC-2011': "ISO/IEC 9899:2011 (“ISO C11”)",
+      '-p1003.1-88': "IEEE Std 1003.1-1988 (“POSIX.1”)",
+      '-p1003.1': "IEEE Std 1003.1 (“POSIX.1”)",
+      '-p1003.1-90': "IEEE Std 1003.1-1990 (“POSIX.1”)",
+      '-iso9945-1-90': "ISO/IEC 9945-1:1990 (“POSIX.1”)",
+      '-p1003.1b-93': "IEEE Std 1003.1b-1993 (“POSIX.1b”)",
+      '-p1003.1b': "IEEE Std 1003.1b (“POSIX.1b”)",
+      '-p1003.1c-95': "IEEE Std 1003.1c-1995 (“POSIX.1c”)",
+      '-p1003.1i-95': "IEEE Std 1003.1i-1995 (“POSIX.1i”)",
+      '-p1003.1-96': "ISO/IEC 9945-1:1996 (“POSIX.1”)",
+      '-iso9945-1-96': "ISO/IEC 9945-1:1996 (“POSIX.1”)",
+      '-xpg3': "X/Open Portability Guide Issue 3 (“XPG3”)",
+      '-p1003.2': "IEEE Std 1003.2 (“POSIX.2”)",
+      '-p1003.2-92': "IEEE Std 1003.2-1992 (“POSIX.2”)",
+      '-iso9945-2-93': "ISO/IEC 9945-2:1993 (“POSIX.2”)",
+      '-p1003.2a-92': "IEEE Std 1003.2a-1992 (“POSIX.2”)",
+      '-xpg4': "X/Open Portability Guide Issue 4 (“XPG4”)",
+      '-susv1': "Version 1 of the Single UNIX Specification (“SUSv1”)",
+      '-xpg4.2': "X/Open Portability Guide Issue 4, Version 2 (“XPG4.2”)",
+      '-xsh4.2': "X/Open System Interfaces and Headers Issue 4, Version 2 (“XSH4.2”)",
+      '-xcurses4.2': "X/Open Curses Issue 4, Version 2 (“XCURSES4.2”)",
+      '-p1003.1g-2000': "IEEE Std 1003.1g-2000 (“POSIX.1g”)",
+      '-svid4': "System V Interface Definition, Fourth Edition (“SVID4”),",
+      '-susv2': "Version 2 of the Single UNIX Specification (“SUSv2”)",
+      '-xbd5': "X/Open Base Definitions Issue 5 (“XBD5”)",
+      '-xsh5': "X/Open System Interfaces and Headers Issue 5 (“XSH5”)",
+      '-xcu5': "X/Open Commands and Utilities Issue 5 (“XCU5”)",
+      '-xns5': "X/Open Networking Services Issue 5 (“XNS5”)",
+      '-xns5.2': "X/Open Networking Services Issue 5.2 (“XNS5.2”)",
+      '-p1003.1-2001': "IEEE Std 1003.1-2001 (“POSIX.1”)",
+      '-susv3': "Version 3 of the Single UNIX Specification (“SUSv3”)",
+      '-p1003.1-2004': "IEEE Std 1003.1-2004 (“POSIX.1”)",
+      '-p1003.1-2008': "IEEE Std 1003.1-2008 (“POSIX.1”)",
+      '-susv4': "Version 4 of the Single UNIX Specification (“SUSv4”)",
+      '-ieee754': "IEEE Std 754-1985",
+      '-iso8601': "ISO 8601",
+      '-iso8802-3': "ISO 8802-3: 1989",
+      '-ieee1275-94': "IEEE Std 1275-1994 (“Open Firmware”)",
+    })[arg[0]]
+  },
+  'Sx': (arg, raw_args, html_args) => `<a class="Sx" href="#${slugify(html_args)}">${html_args}</a>`,
+  'Sy': (arg, raw_args, html_args) => `<strong class="Sy">${html_args}</strong>`,
+  // 'Ta'
+  'Tg': (arg, raw_args, html_args) => `<dt class="Tg">${html_args}</dt>`,
+  'Tn': (arg, raw_args, html_args) => `<span class="Tn">${html_args}</span>`,
+  'Ud': () => "currently under development.",
+  'Ux': () => "UNIX",
+  'Va': (arg, raw_args, html_args) => `<span class="variable-name Va">${html_args}</span>`,
+  'Vt': (arg, raw_args, html_args) => {
+    if(mdoc_current_section == 'SYNOPSIS') {
+      return `<div class="variable-type Vt">${html_args}</div>`
+    } else {
+      return `<span class="variable-type Vt">${html_args}</span>`
+    }
+  },
+  'Xc': () => "</div>",
+  'Xo': (arg, raw_args, html_args) => `<div class="Xo">${html_args}`,  // TODO not_implemented
+  'Xr': (arg, raw_args, html_args) => `<a class="Xr" href="">${escapeHtml(arg[0]}(${escapeHtml(arg[1])})</a>`,
 }
 
 export function renderMan(troffText) {
   let html = '';
+  let postponed_results = {};
+  
   for(let line of troffText.split(/\r?\n/)) {
     if(line === control_char || line === nonbreak_control_char) {
       continue
@@ -809,21 +968,26 @@ export function renderMan(troffText) {
         continue
       }
       let raw_args = match[3] === undefined ? '' : match[3]
-      let arg = raw_args.split(/\s+/)  // TODO what is the correct tokenization here?
+      let arg = raw_args.split(/\s+/)  // TODO what is the correct tokenization here? TODO respect double quotes
+      
+      let macro_results = []
       if(macro in macros) {
-        macro_result = macros[macro](arg, raw_args, unescapeLine(raw_args))
-        if(macro_result === undefined) {
-          continue
-        }
+        let html_args = unescapeLine(raw_args)
+        let macro_result = macros[macro](arg, raw_args, html_args)
+        if(typeof == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
+        macro_results.append(macro_result)
+      }
+      
+      for(let macro_result in macro_results) {
         if(typeof macro_result == 'string') {
           html += macro_result
         }
         else {
+          if('plaintext' in macro_result) {
+            html += escapeHtml(macro_result.plaintext)
+          }
           if('html' in macro_result) {
             html += macro_result.html
-          }
-          else if('plaintext' in macro_result) {
-            html += escapeHtml(macro_result.plaintext)
           }
           if('close' in macro_result) {
             html += `</${macro_result.close}>`
@@ -834,7 +998,7 @@ export function renderMan(troffText) {
           }
         }
       }
-      else {
+      if(!(macro in macros)) {
         console.log(`macro not supported: ${macro}`)
       }
     }

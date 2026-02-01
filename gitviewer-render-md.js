@@ -1,18 +1,11 @@
 
 import { state } from './gitviewer-common.js'
+import { slugify } from './gitviewer-util.js'
 import { mimeTypeFromFilename, getTreeEntryContent, resolveRelativePath } from './gitviewer-file.js'
 
 const defaultMdRenderer = new marked.Renderer()
 const mdRenderer = new marked.Renderer()
 
-function slugify(text) {
-    return text.toLowerCase()
-        .replace(/<[^>]+>/g, '')
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .trim();
-}
 
 function isAbsoluteLink(link) {
   return link.match(/^([^/]+):/)

@@ -107,6 +107,15 @@ export function escapeHtml(text) {
              .replace(/['']/g, '&#39;');
 }
 
+function slugify(text) {
+  return text.toLowerCase()
+         .replace(/<[^>]+>/g, '')
+         .replace(/[^\w\s-]/g, '')
+         .replace(/\s+/g, '-')
+         .replace(/-+/g, '-')
+         .trim();
+}
+
 export function createMailtoLink(email) {
   const anchor = document.createElement('A')
   anchor.href = 'mailto:' + email
