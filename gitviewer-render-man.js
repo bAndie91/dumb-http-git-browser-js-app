@@ -6,6 +6,15 @@ let nonbreak_control_char = "'"
 let escape_char = "\\"
 let escape_char_saved = escape_char
 let enable_escpe_char = true
+const troff_string = {
+  'R': '®',
+  // 'S' // TODO Change to default font size
+  'Tm': '™',
+  'lq': '“',
+  'rq': '”',
+}
+const troff_env = {}
+const troff_register = {}
 
 
 function resolve_escape(name, param) {
@@ -106,6 +115,7 @@ function resolve_escape(name, param) {
   if(name == '*') return escapeHtml(troff_string[param]);
   if(name == 'n') return escapeHtml(troff_register[param]);
   if(name == 'f' || /* just treat \F as \f */ name == 'F') {
+    // TODO handle \f1
     let res = ''
     if(inline_fonts.size >= 1) res += "</font>"
     if(param == 'P' || param == 'R') {
@@ -113,6 +123,8 @@ function resolve_escape(name, param) {
     }
     else {
       const fonts = param.split('')
+      // take each letter on its own, so "\fCW" becomes "font-C font-W", likewise "\fSM" becomes "font-S font-M",
+      // which is a bit misleading because "CW" and "SM" are both supposed to be atomic font symbols, unlike "BI" or "CR".
       fonts.forEach((f) => inline_fonts.add(f))
       const classes = [...inline_fonts].map((f) => `font-${f}`).join(' ')
       res += `<font class="${classes}">`
@@ -122,9 +134,10 @@ function resolve_escape(name, param) {
   }
   // not implementing \F - not much used:
   //if(name == 'F') return `<span class="font-family-${param}">`;  // when to close?
-  if(name == 'h') /* Local horizontal motion; move right N (left if negative). */ return ' '.repeat(param || 1);
+  if(name == 'h') /* Local horizontal motion; move right N (left if negative). */ return ' '.repeat(param > 0 ? param : 1);
   
-  if(name.length == 1) return name  /* If  a backslash is followed by a character that does not constitute a defined escape sequence, the backslash is silently ignored and the character maps to itself. */
+  /* If  a backslash is followed by a character that does not constitute a defined escape sequence, the backslash is silently ignored and the character maps to itself. */
+  if(name.length == 1) return name;
   
   let m = name.match(/^u([a-zA-Z0-9]+)$/)
   if(m) {
@@ -132,24 +145,41 @@ function resolve_escape(name, param) {
     return `&#x${m[1]};`;
   }
   
-  return `<span class="unknown-escape-code escape-code-${name}">&#xFFFD;</span>`
+  return `<span class="unknown-escape-code" data-escape-code="${escapeHtml(name)}">${param || "&#xFFFD;"}</span>`
 }
-function unescape_cb(match, group, pos) {
-  let m = group.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)
-  if(m) {
-    let name = m[1]
-    let param = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : (m[5] !== undefined ? m[5] : m[6]))
-    return resolve_escape(name, param)
+function unescape_cb(whole_match, group_1, group_2, pos) {
+  if(group_1.match(/^\\/)) {
+    let m = group_2.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)
+    if(m) {
+      let esc_name = m[1]
+      let esc_param = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : (m[5] !== undefined ? m[5] : m[6]))
+      return resolve_escape(esc_name, esc_param)
+    }
+    if(group_2 == '') {
+      /* escape was at the end of line */
+      line_continuation = true
+      return ''
+    }
+    throw new Error(`don't know how to unescape: ${group}`)
   }
-  if(group == '') {
-    /* escape was at the end of line */
-    line_continuation = true
-    return ''
+  else {
+    /* not escaped substring2 */
+    return escapeHtml(group_1)
   }
-  throw new Error(`don't know how to unescape: ${group}`)
 }
 function unescapeLine(line) {
-  return line.replace(/\\([acdeEprtu]|[fFgkmMnsVY\*]\(..|[fFgkmMnsVY\*]\[.*?\]|[AbBCDhHlLNoRsSvwxXZ]'.*?'|[fFgkmMnOsVYz].|.|$)/g, unescape_cb)
+  if(line === undefined) return ''
+  return line.replace(/(\\([acdeEprtu]|[fFgkmMnsVY\*]\(..|[fFgkmMnsVY\*]\[.*?\]|[AbBCDhHlLNoRsSvwxXZ]'.*?'|[fFgkmMnOsVYz].|.|$)|[^\\]+)/g, unescape_cb)
+}
+
+function alternating(arg, tags) {
+  let html = ''
+  for(let i=0; i < arg.length; i++) {
+    html += '<' + tags[i % tags.length] + '>'
+    html += unescapeLine(arg[i])
+    html += '</' + tags[i % tags.length] + '>'
+  }
+  return html
 }
 
 
@@ -160,9 +190,6 @@ let center_lines_counter = 0
 let right_justify_lines_counter = 0
 let underline_lines_counter = 0
 const current_classes = []
-const troff_string = {}
-const troff_env = {}
-const troff_register = {}
 const font_family_stack = []
 const font_stack = []
 const inline_fonts = new Set()
@@ -175,9 +202,26 @@ let mdoc_author_mode = 'nosplit'
 const mdoc_Eo_stack = []
 let mdoc_Es_delimiters = ['', '']
 let mdoc_Nm = undefined
-let mdoc_current_section = ''
+let current_section = ''
 const mdoc_list_stack = []
 let mdoc_spacing_mode = true
+let in_paragraph = false
+const prevailing_indent_stack = [ undefined ]
+let relative_margin_indent = 0
+
+
+function prevailing_indent() {
+  const default_prevailing_indent = 0.5  // declared in inches ("in") but should be measured in "en" or "em"
+  const indent = prevailing_indent_stack.slice(-1)[0]
+  if(indent === undefined) return default_prevailing_indent
+  return indent
+}
+function close_current_paragraph() {
+  let res = ''
+  if(in_paragraph) res += '</p>'
+  in_paragraph = false
+  return res
+}
 
 
 const macros = {
@@ -464,7 +508,7 @@ const macros = {
                  If cond then anything else goto .el.
        .if cond anything
                  If cond then anything; otherwise do nothing.
-       .ig       Ignore text until .. is encountered.
+       .ig       Ignore text until .. is encountered. TODO
        .ig end   Ignore text until .end is called.
 */
   'in': function(arg) {
@@ -656,7 +700,7 @@ const macros = {
                  infinity.
        .tc       Remove tab repetition glyph.
        .tc c     Set tab repetition glyph to c.
-       .ti ±N    Temporary indent next line (default scaling indicator m).
+       .ti ±N    Temporary indent next line (default scaling indicator m). TODO
        .tkf font s1 n1 s2 n2
                  Enable track kerning for font.
 */
@@ -675,7 +719,7 @@ const macros = {
        .tmc anything
                  Similar to .tm1 without emitting a final newline.
        .tr abcd...
-                 Translate a to b, c to d, etc. on output.
+                 Translate a to b, c to d, etc. on output. TODO
        .trf filename
                  Transparently output the contents of file filename.
        .trin abcd...
@@ -840,7 +884,7 @@ const macros = {
   'Hf': () => `<div class="Hf">&#xFFFD;</div>`,
   'Ic': (arg, raw_args, html_args) => `<span class="internal-command Ic">${html_args || "&#xFFFD;"}</span>`,
   'In': (arg, raw_args, html_args) => {
-    if(mdoc_current_section == 'SYNOPSIS') {
+    if(current_section == 'SYNOPSIS') {
       return `<div class="include-file In">#include &lt;${html_args || "&#xFFFD;"}&gt;</div>`
     } else {
       return `<span class="include-file In">&lt;${html_args || "&#xFFFD;"}&gt;</span>`
@@ -892,7 +936,7 @@ const macros = {
   'Rv': (arg, raw_args, html_args) => `<span class="Rv">The ${unescapeLine(arg[1]) || mdoc_Nm} function returns the value 0 if successful; otherwise the value -1 is returned and the global variable errno is set to indicate the error.</span>`,
   'Sc': () => "&apos;</div>",
   'Sh': (arg, raw_args, html_args) => {
-    mdoc_current_section = html_args
+    current_section = html_args
     return `<h2><a name="${slugify(html_args)}">${html_args}</a></h2>`
   },
   'Sm': (arg) => {
@@ -960,7 +1004,7 @@ const macros = {
   'Ux': () => "UNIX",
   'Va': (arg, raw_args, html_args) => `<span class="variable-name Va">${html_args}</span>`,
   'Vt': (arg, raw_args, html_args) => {
-    if(mdoc_current_section == 'SYNOPSIS') {
+    if(current_section == 'SYNOPSIS') {
       return `<div class="variable-type Vt">${html_args}</div>`
     } else {
       return `<span class="variable-type Vt">${html_args}</span>`
@@ -969,6 +1013,79 @@ const macros = {
   'Xc': () => "</div>",
   'Xo': (arg, raw_args, html_args) => `<div class="Xo">${html_args}`,  // TODO not_implemented
   'Xr': (arg, raw_args, html_args) => `<a class="Xr" href="">${escapeHtml(arg[0])}(${escapeHtml(arg[1])})</a>`,
+  
+  /* man(7) macros */
+  
+  'TH': (arg, raw_args, html_args) => `<div class="TH">
+      <div class="TH-top">
+        <h1>${unescapeLine(arg[0])} <span class="section">(${unescapeLine(arg[1])})</span></h1>
+        <span class="manual">${unescapeLine(arg[4])}</span>
+      </div>
+      <div class="TH-bottom">
+        <span class="source">${unescapeLine(arg[3])}</span>
+        <span class="date">${unescapeLine(arg[2])}</span>
+      </div>
+    </div>`,
+  'SH': (arg, raw_args, html_args) => {
+    current_section = html_args
+    return `<h2 class="SH">${html_args}</h2>`
+  },
+  // TODO If no arguments are given, the command is applied to the following line of text.
+  'B': (arg, raw_args, html_args) => `<b>${html_args}</b>`,
+  'BI': (arg, raw_args, html_args) => alternating(arg, ['b', 'i']),
+  'BR': (arg, raw_args, html_args) => alternating(arg, ['b', 'font class="font-R"']),
+  'I': (arg, raw_args, html_args) => `<i>${html_args}</i>`,
+  'IB': (arg, raw_args, html_args) => alternating(arg, ['i', 'b']),
+  'IR': (arg, raw_args, html_args) => alternating(arg, ['i', 'font class="font-R"']),
+  'RB': (arg, raw_args, html_args) => alternating(arg, ['font class="font-R"', 'b']),
+  'RI': (arg, raw_args, html_args) => alternating(arg, ['font class="font-R"', 'i']),
+  'SB': (arg, raw_args, html_args) => alternating(arg, ['font class="font-S"', 'b']),
+  'SM': (arg, raw_args, html_args) => `<font class="font-S">${html_args}</font>`,
+  'LP': () => { alias: 'PP' },
+  'P': () => { alias: 'PP' },
+  'PP': () => {
+    let html = close_current_paragraph()
+    prevailing_indent_stack.push(undefined)
+    html += '<p>'  // TODO apply prevailing_indent
+    in_paragraph = true
+    return html
+  },
+  'RS': (arg) => {
+    relative_margin_indent = prevailing_indent() + arg[0]
+    prevailing_indent_stack.push(undefined)
+  },
+  'RE': () => {
+    relative_margin_indent = 0
+    prevailing_indent_stack.pop()
+  },
+  'HP': (arg) => {
+    let html = close_current_paragraph()
+    in_paragraph = true
+    return `<p class="HP">`  // TODO add arg[0] add hanging indentation
+  },
+  'IP': (arg, raw_args, html_args) => {
+    let tag
+    let indent
+    if(arg.length == 1) { tag = ''; indent = arg[0]; }
+    else { tag = unescapeLine(arg[0]); indent = arg[1]; }
+    return `<p class="IP"><span class="IP-tag">${tag}</span>`  // TODO add hanging indentation
+  },
+  'TP': (arg, raw_args, html_args) => {
+    return `<p class="TP">`  // TODO get the tag from the next line and add hanging indentation
+  },
+  'UR': (arg, raw_args, html_args) => {
+    current_UR = html_args
+    return `<a href="${html_args}" class="UR">`
+  },
+  'UE': (arg, raw_args, html_args) => {
+    // TODO  show current_UR as link text unless there was any link text
+    return `</a>${html_args}`
+  },
+  // 'DT': // TODO reset tabs
+  // 'PD': () => {} // TODO set inter-paragraph vertical space
+  'SS': (arg, raw_args, html_args) => `<h3 class="SS">${html_args}</h2>`,
+  // TS
+  // TE
 }
 
 const parsed_macros = ['It','Nm','Sh','Ss',
@@ -976,7 +1093,9 @@ const parsed_macros = ['It','Nm','Sh','Ss',
   'Aq','Bq','Brq','D1','Dl','Dq','En','Op','Pq','Ql','Qq','Sq','Vt', 'Ta',
   'Ad','An','Ap','Ar','At','Bsx','Bx','Cd','Cm','Dv','Dx','Em','Er','Es','Ev','Fa','Fl','Fn','Fr','Ft','Fx','Ic','Li','Lk','Ms','Mt','Nm','No','Ns','Nx','Ot','Ox','Pa','Pf','St','Sx','Sy','Tn','Ux','Va','Vt','Xr']
 
+
 export function renderMan(troffText) {
+  // TODO reset global variables
   let html = '';
   
   for(let line of troffText.split(/\r?\n/)) {
@@ -991,21 +1110,21 @@ export function renderMan(troffText) {
         continue
       }
       let raw_args = match[3] === undefined ? '' : match[3]
-      let arg = raw_args.split(/\s+/)  // TODO what is the correct tokenization here? TODO respect double quotes
+      let arg = (raw_args.match(/"(.*?)"|([^ ]+)/g) || []).map((s) => s.replace(/^"(.*)"$/, '$1'))
       
       let macro_results = []
       if(macro in macros) {
-        let html_args = unescapeLine(raw_args)
+        let html_args = arg.map((a) => unescapeLine(a)).join(' ')
         let macro_result = macros[macro](arg, raw_args, html_args)
         if(typeof macro_result == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
         macro_results.push(macro_result)
       }
       
-      for(let macro_result in macro_results) {
+      for(let macro_result of macro_results) {
         if(typeof macro_result == 'string') {
           html += macro_result
         }
-        else {
+        else if(typeof macro_result == 'object') {
           if('plaintext' in macro_result) {
             html += escapeHtml(macro_result.plaintext)
           }
@@ -1027,10 +1146,12 @@ export function renderMan(troffText) {
     }
     else {
       // plain text
+      // TODO handle completely empty lines
       html += unescapeLine(line)
-      if(!line_continuation) html += ' '
-      line_continuation = false
     }
+    
+    if(!line_continuation) html += ' '
+    line_continuation = false
   }
   return html;
 }

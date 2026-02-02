@@ -100,6 +100,7 @@ export function formatDateTime(d) {
 }
 
 export function escapeHtml(text) {
+  if(text === undefined) return ''
   return text.replace(/&/g, '&amp;')
              .replace(/</g, '&lt;')
              .replace(/>/g, '&gt;')
