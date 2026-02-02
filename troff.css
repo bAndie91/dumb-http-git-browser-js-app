@@ -111,3 +111,13 @@
 .Tn {
   font-variant: small-caps;
 }
+
+.font-B {
+  font-weight: bold;
+}
+.font-I {
+  font-style: italic;
+}
+.font-C {
+  font-family: monospace;
+}

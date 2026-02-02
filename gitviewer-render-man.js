@@ -9,7 +9,7 @@ let enable_escpe_char = true
 
 
 function resolve_escape(name, param) {
-  if(name == '"' || name == '#') // TODO
+  if(name == '"' || name == '#') return 'TODO'  // TODO
   
   const r = ({
     '´':  '´',
@@ -105,13 +105,29 @@ function resolve_escape(name, param) {
   
   if(name == '*') return escapeHtml(troff_string[param]);
   if(name == 'n') return escapeHtml(troff_register[param]);
-  if(name == 'f') // TODO change font
-  if(name == 'F') // TODO change font family
+  if(name == 'f' || /* just treat \F as \f */ name == 'F') {
+    let res = ''
+    if(inline_fonts.size >= 1) res += "</font>"
+    if(param == 'P' || param == 'R') {
+      inline_fonts.clear()
+    }
+    else {
+      const fonts = param.split('')
+      fonts.forEach((f) => inline_fonts.add(f))
+      const classes = [...inline_fonts].map((f) => `font-${f}`).join(' ')
+      res += `<font class="${classes}">`
+      // TODO when to close?
+    }
+    return res;
+  }
+  // not implementing \F - not much used:
+  //if(name == 'F') return `<span class="font-family-${param}">`;  // when to close?
   if(name == 'h') /* Local horizontal motion; move right N (left if negative). */ return ' '.repeat(param || 1);
   
   if(name.length == 1) return name  /* If  a backslash is followed by a character that does not constitute a defined escape sequence, the backslash is silently ignored and the character maps to itself. */
   
-  if(let m = name.match(/^u([a-zA-Z0-9]+)$/)) {
+  let m = name.match(/^u([a-zA-Z0-9]+)$/)
+  if(m) {
     /* unicode char */
     return `&#x${m[1]};`;
   }
@@ -119,9 +135,10 @@ function resolve_escape(name, param) {
   return `<span class="unknown-escape-code escape-code-${name}">&#xFFFD;</span>`
 }
 function unescape_cb(match, group, pos) {
-  if(let m = group.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)) {
+  let m = group.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)
+  if(m) {
     let name = m[1]
-    let param = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : m[5])
+    let param = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : (m[5] !== undefined ? m[5] : m[6]))
     return resolve_escape(name, param)
   }
   if(group == '') {
@@ -148,6 +165,7 @@ const troff_env = {}
 const troff_register = {}
 const font_family_stack = []
 const font_stack = []
+const inline_fonts = new Set()
 const fill_color_stack = []
 const indention_stack = []
 let enable_fill = false
@@ -411,8 +429,6 @@ const macros = {
   ft: function(arg) {
     //     .ft       Return to previous font.  Same as \ or \.
     //     .ft font  Change to font name or number font; same as \f[font] escape sequence.
-    // R: roman, B: bold, I: italic
-    // CR CI CB: monospace
     if(arg.length == 0) {
       font_stack.pop()
     }
@@ -698,6 +714,7 @@ const macros = {
 */
 
   /* mdoc macros */
+  
   '%A': (arg, raw_args, html_args) => `<span class="author-name">${html_args}</span>`,
   '%B': (arg, raw_args, html_args) => `<span class="book-title">${html_args}</span>`,
   '%C': (arg, raw_args, html_args) => `<span class="publication-location">${html_args}</span>`,
@@ -715,7 +732,8 @@ const macros = {
   'Ac': () => "&gt;</div>",
   'Ad': (arg, raw_args, html_args) => `<span class="memory-address">${html_args}</span>`,
   'An': (arg, raw_args, html_args) => {
-    if(let m = raw_args.match(/^-(.*)/)) {
+    let m = raw_args.match(/^-(.*)/)
+    if(m) {
       mdoc_author_mode = m[1]
       return ''
     }
@@ -733,14 +751,14 @@ const macros = {
   'At': (arg, raw_args, html_args) => {
      if(raw_args.match(/v[1-7]|32v/)) return { plaintext: `${raw_args} version of AT&T UNIX` }
      if(raw_args.match(/III/))        return { plaintext: "AT&T System III UNIX" }
-     if(raw_args.match(/V|V\.[1-4]))  return { plaintext: `${raw_args} version of AT&T System V UNIX` }
+     if(raw_args.match(/V|V\.[1-4]/)) return { plaintext: `${raw_args} version of AT&T System V UNIX` }
      return ""
   },
   'Bc': () => "]</div>",
   'Bd': (arg, raw_args, html_args) => {
     const classes = [ `Bd${arg[0]}` ]
-    if(arg[1] == '-offset') classes.append(`offset-${arg[2]}`)
-    if('-compact' in arg) classes.append(`compact`)
+    if(arg[1] == '-offset') classes.push(`offset-${arg[2]}`)
+    if('-compact' in arg) classes.push(`compact`)
     return { open: 'div', classes }
   },
   // 'Bf': () => '',
@@ -749,12 +767,12 @@ const macros = {
     let tag = 'ul'
     const classes = [ `Bl${arg[0]}` ]
     for(let i = 1; i < arg.length-1; i++) {
-      if(arg[i] == '-offset') classes.append(`offset-${arg[i+1]}`)
+      if(arg[i] == '-offset') classes.push(`offset-${arg[i+1]}`)
       // TODO [-width val]
     }
-    if('-compact' in arg) classes.append(`compact`)
+    if('-compact' in arg) classes.push(`compact`)
     if('-enum' in arg) tag = 'ol'
-    mdoc_list_stack.append(tag)
+    mdoc_list_stack.push(tag)
     return { open: tag, classes }
   },
   'Bo': (arg, raw_args, html_args) => `<div class="Bo">[${html_args}`,
@@ -833,7 +851,7 @@ const macros = {
     let prev_obj = mdoc_list_stack.pop()
     if(prev_obj == 'li') html += '</li>'
     else mdoc_list_stack.push(prev_obj)
-    mdoc_list_stack.append('li')
+    mdoc_list_stack.push('li')
     html += `<li><span class="item-head">${html_args}</span>`
     return { html }
     // TODO take care of the ".Bl -column" type lists
@@ -844,8 +862,9 @@ const macros = {
   'Lp': () => { alias: 'Pp' },
   'Ms': (arg) => `<span class="Ms">&${arg[0]};</span>`,  // most mathematical symbols work as html entity
   'Mt': (arg, raw_args, html_args) => `<a href="mailto:${unescapeLine(arg[0])}" class="Mt">${unescapeLine(arg[0])}</a>`,
-  'Nd': (arg, raw_args, html_args) => `<span class="Nd">${html_args}</span>`,
+  'Nd': (arg, raw_args, html_args) => `<span class="Nd">${html_args}</span>`,  // TODO .Nd is an implicite block closed by .Sh
   'Nm': (arg, raw_args, html_args) => {
+    // TODO .Nm is an implicite block (but only when invoked as the first macro in a SYNOPSIS section line) closed by an other .Nm, .Sh, or .Ss
     if(mdoc_Nm === undefined) mdoc_Nm = html_args
     return `<span class="Nm">${mdoc_Nm}</span>`
   },
@@ -862,7 +881,7 @@ const macros = {
   'Pc': () => ")</div>",
   'Pf': (arg, raw_args, html_args) => `<span class="Pf">${unescapeLine(arg[0])}</span>`,  // TODO no space after
   'Po': (arg, raw_args, html_args) => `<div class="Po">${html_args}`,
-  'Pp': () => ,  // TODO paragraph break or whatever block we are in
+  'Pp': () => 'TODO',  // TODO paragraph break or whatever block we are in
   'Pq': (arg, raw_args, html_args) => `<div class="Pq">(${html_args}`,
   'Qc': () => "</div>",
   'Ql': (arg, raw_args, html_args) => `<span class="Ql">${html_args}</span>`,
@@ -871,7 +890,7 @@ const macros = {
   'Re': () => '</div>',
   'Rs': () => '<div class="bibliographic-reference Rs">',
   'Rv': (arg, raw_args, html_args) => `<span class="Rv">The ${unescapeLine(arg[1]) || mdoc_Nm} function returns the value 0 if successful; otherwise the value -1 is returned and the global variable errno is set to indicate the error.</span>`,
-  'Sc': () => "&apos;</div>";
+  'Sc': () => "&apos;</div>",
   'Sh': (arg, raw_args, html_args) => {
     mdoc_current_section = html_args
     return `<h2><a name="${slugify(html_args)}">${html_args}</a></h2>`
@@ -949,12 +968,16 @@ const macros = {
   },
   'Xc': () => "</div>",
   'Xo': (arg, raw_args, html_args) => `<div class="Xo">${html_args}`,  // TODO not_implemented
-  'Xr': (arg, raw_args, html_args) => `<a class="Xr" href="">${escapeHtml(arg[0]}(${escapeHtml(arg[1])})</a>`,
+  'Xr': (arg, raw_args, html_args) => `<a class="Xr" href="">${escapeHtml(arg[0])}(${escapeHtml(arg[1])})</a>`,
 }
+
+const parsed_macros = ['It','Nm','Sh','Ss',
+  'Ac','Ao','Bc','Bo','Brc','Bro','Dc','Do','Ec','Eo','Fc','Oc','Oo','Pc','Po','Qc','Qo','Sc','So','Xc','Xo',
+  'Aq','Bq','Brq','D1','Dl','Dq','En','Op','Pq','Ql','Qq','Sq','Vt', 'Ta',
+  'Ad','An','Ap','Ar','At','Bsx','Bx','Cd','Cm','Dv','Dx','Em','Er','Es','Ev','Fa','Fl','Fn','Fr','Ft','Fx','Ic','Li','Lk','Ms','Mt','Nm','No','Ns','Nx','Ot','Ox','Pa','Pf','St','Sx','Sy','Tn','Ux','Va','Vt','Xr']
 
 export function renderMan(troffText) {
   let html = '';
-  let postponed_results = {};
   
   for(let line of troffText.split(/\r?\n/)) {
     if(line === control_char || line === nonbreak_control_char) {
@@ -974,8 +997,8 @@ export function renderMan(troffText) {
       if(macro in macros) {
         let html_args = unescapeLine(raw_args)
         let macro_result = macros[macro](arg, raw_args, html_args)
-        if(typeof == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
-        macro_results.append(macro_result)
+        if(typeof macro_result == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
+        macro_results.push(macro_result)
       }
       
       for(let macro_result in macro_results) {
