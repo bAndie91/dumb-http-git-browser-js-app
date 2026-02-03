@@ -60,6 +60,8 @@ async function expandSubTree(li, oid) {
 }
 
 async function renderTree(parentElem, parentPath) {
+  const auto_filepath = new URLSearchParams(location.search).get('filepath')
+  
   for (const entry of state.treeObjects.filter(entry => entry.path == parentPath)) {
     const filePath = parentPath + entry.filename
     const li = document.createElement('li')
@@ -85,6 +87,9 @@ async function renderTree(parentElem, parentPath) {
       if(state.selectedFilePath == filePath) {
         await selectFile(filePath);
       }
+    }
+    else if(filePath === auto_filepath) {
+      await selectFile(filePath);
     }
     else if(['README', 'README.md', 'README.txt'].indexOf(entry.filename)>=0) {
       await selectFile(filePath);

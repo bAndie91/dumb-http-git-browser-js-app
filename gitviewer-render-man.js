@@ -1,5 +1,5 @@
 
-import { escapeHtml } from './gitviewer-util.js';
+import { escapeHtml, slugify } from './gitviewer-util.js';
 
 let control_char = '.'
 let nonbreak_control_char = "'"
@@ -15,6 +15,33 @@ const troff_string = {
 }
 const troff_env = {}
 const troff_register = {}
+
+let last_adj_mode
+const font_boldness = []
+let center_lines_counter = 0
+let right_justify_lines_counter = 0
+let underline_lines_counter = 0
+const current_classes = []
+const font_family_stack = []
+const font_stack = []
+const inline_fonts = new Set()
+const fill_color_stack = []
+const indention_stack = []
+let enable_fill = false
+let nospace_mode = false
+let line_continuation = false
+let mdoc_author_mode = 'nosplit'
+const mdoc_Eo_stack = []
+let mdoc_Es_delimiters = ['', '']
+let mdoc_Nm = undefined
+let current_section = ''
+const mdoc_list_stack = []
+let mdoc_spacing_mode = true
+let in_paragraph = false
+const prevailing_indent_stack = [ undefined ]
+let relative_margin_indent = 0
+let current_UR_target = undefined
+let current_UR_has_text = false
 
 
 function resolve_escape(name, param) {
@@ -149,7 +176,12 @@ function resolve_escape(name, param) {
 }
 function unescape_cb(whole_match, group_1, group_2, pos) {
   if(group_1.match(/^\\/)) {
-    let m = group_2.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)
+    let m = group_2.match(/^s(.+)/)
+    if(m) {
+      let esc_param = m[1].replace(/[^\d+-]/g, '')  /* keep only the digits and +/- signs */
+      return resolve_escape('s', esc_param)
+    }
+    m = group_2.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)
     if(m) {
       let esc_name = m[1]
       let esc_param = m[3] !== undefined ? m[3] : (m[4] !== undefined ? m[4] : (m[5] !== undefined ? m[5] : m[6]))
@@ -169,7 +201,7 @@ function unescape_cb(whole_match, group_1, group_2, pos) {
 }
 function unescapeLine(line) {
   if(line === undefined) return ''
-  return line.replace(/(\\([acdeEprtu]|[fFgkmMnsVY\*]\(..|[fFgkmMnsVY\*]\[.*?\]|[AbBCDhHlLNoRsSvwxXZ]'.*?'|[fFgkmMnOsVYz].|.|$)|[^\\]+)/g, unescape_cb)
+  return line.replace(/(\\([acdeEprtu]|[fFgkmMnVY\*]\(..|[fFgkmMnVY\*]\[.*?\]|[AbBCDhHlLNoRSvwxXZ]'.*?'|[fFgkmMnOVYz].|[s]([+-]?\d|\([+-]?\d\d|[+-]\(\d\d|\[[+-]?\d+\]|[+-]?\[\d+\]|'[+-]?\d+'|[+-]?'\d+')|.|$)|[^\\]+)/g, unescape_cb)
 }
 
 function alternating(arg, tags) {
@@ -181,33 +213,6 @@ function alternating(arg, tags) {
   }
   return html
 }
-
-
-
-let last_adj_mode
-const font_boldness = []
-let center_lines_counter = 0
-let right_justify_lines_counter = 0
-let underline_lines_counter = 0
-const current_classes = []
-const font_family_stack = []
-const font_stack = []
-const inline_fonts = new Set()
-const fill_color_stack = []
-const indention_stack = []
-let enable_fill = false
-let nospace_mode = false
-let line_continuation = false
-let mdoc_author_mode = 'nosplit'
-const mdoc_Eo_stack = []
-let mdoc_Es_delimiters = ['', '']
-let mdoc_Nm = undefined
-let current_section = ''
-const mdoc_list_stack = []
-let mdoc_spacing_mode = true
-let in_paragraph = false
-const prevailing_indent_stack = [ undefined ]
-let relative_margin_indent = 0
 
 
 function prevailing_indent() {
@@ -615,8 +620,8 @@ const macros = {
        .pnr      Print the names and contents of all currently defined number registers on stderr.
        .po       Change to previous page offset.  The current page offset is available in register .o.
        .po ±N    Page offset N.
-       .ps       Return to previous point size.
-       .ps ±N    Point size; same as \s[±N].
+       .ps       Return to previous point size. // TODO
+       .ps ±N    Point size; same as \s[±N]. // TODO
        .psbb filename
                  Get the bounding box of a PostScript image filename.
        .pso command
@@ -676,6 +681,7 @@ const macros = {
     html += '<div class="vertical-spacer"></div>'.repeat(arg[0] || 1)
     return { 'html': html }
   },
+  // 'Sp':
 /*
        .special  Reset global list of special fonts to be empty.
        .special s1 s2 ...
@@ -773,7 +779,7 @@ const macros = {
   '%T': (arg, raw_args, html_args) => `<span class="artical-title">${html_args}</span>`,
   '%U': (arg, raw_args, html_args) => `<a class="reference-document" href="${escapeHtml(raw_args)}">${html_args}</a>`,
   '%V': (arg, raw_args, html_args) => `<span class="volume-number">${html_args}</span>`,
-  'Ac': () => "&gt;</div>",
+  'Ac': () => "⟩</div>",
   'Ad': (arg, raw_args, html_args) => `<span class="memory-address">${html_args}</span>`,
   'An': (arg, raw_args, html_args) => {
     let m = raw_args.match(/^-(.*)/)
@@ -785,9 +791,9 @@ const macros = {
       return `<span class="author-name">${html_args}</span>`
     }
   },
-  'Ao': (arg, raw_args, html_args) => `<div class="Ao">&lt;${html_args}`,
+  'Ao': (arg, raw_args, html_args) => `<div class="Ao">⟨${html_args}`,
   'Ap': () => '&apos;',
-  'Aq': (arg, raw_args, html_args) => `<span class="Aq">&lt;${html_args}&gt;</span>`,
+  'Aq': (arg, raw_args, html_args) => `<span class="Aq">⟨${unescapeLine(arg[0])}⟩</span>${unescapeLine(arg.slice(1).join(' '))}`,
   'Ar': (arg, raw_args, html_args) => {
     if(html_args == '') html_args = "file ..."
     return `<span class="command-argument Ar">${html_args}</span>`
@@ -852,8 +858,10 @@ const macros = {
     let html = ''
     while(true) {
       let prev_obj = mdoc_list_stack.pop()
+      if(prev_obj === undefined) break;
       if(prev_obj == 'li') html += '</li>'
-      else if(prev_obj in ['ul', 'ol']) { html += `</${prev_obj}>`; break; }
+      else if(prev_obj.match(/^[ou]l$/)) { html += `</${prev_obj}>`; break; }
+      else throw new Error(`invalid thing in mdoc_list_stack: ${prev_obj}`)
     }
     return { html }
   },
@@ -900,6 +908,7 @@ const macros = {
     return { html }
     // TODO take care of the ".Bl -column" type lists
   },
+  // IX
   // Lb
   'Li': (arg, raw_args, html_args) => `<span class="Li">${html_args}</span>`,
   'Lk': (arg, raw_args, html_args) => `<a href="${unescapeLine(arg[0])}" class="Lk">${unescapeLine(arg[1] || arg[0])}</a>`,
@@ -1012,7 +1021,7 @@ const macros = {
   },
   'Xc': () => "</div>",
   'Xo': (arg, raw_args, html_args) => `<div class="Xo">${html_args}`,  // TODO not_implemented
-  'Xr': (arg, raw_args, html_args) => `<a class="Xr" href="">${escapeHtml(arg[0])}(${escapeHtml(arg[1])})</a>`,
+  'Xr': (arg, raw_args, html_args) => `<a class="Xr">${escapeHtml(arg[0])}(${escapeHtml(arg[1])})</a>`,
   
   /* man(7) macros */
   
@@ -1074,12 +1083,20 @@ const macros = {
     return `<p class="TP">`  // TODO get the tag from the next line and add hanging indentation
   },
   'UR': (arg, raw_args, html_args) => {
-    current_UR = html_args
-    return `<a href="${html_args}" class="UR">`
+    current_UR_target = html_args
+    current_UR_has_text = false
+    return { html: `<a href="${html_args}" class="UR">`, callbacks: [{
+      trigger: ' ',
+      remover: 'UE',
+      func: (text) => { if(text) current_UR_has_text = true; },
+    }]}
   },
   'UE': (arg, raw_args, html_args) => {
-    // TODO  show current_UR as link text unless there was any link text
-    return `</a>${html_args}`
+    let html = ''
+    if(!current_UR_has_text) html += current_UR_target
+    html += `</a>${html_args}`
+    current_UR_target = undefined
+    return html
   },
   // 'DT': // TODO reset tabs
   // 'PD': () => {} // TODO set inter-paragraph vertical space
@@ -1097,6 +1114,7 @@ const parsed_macros = ['It','Nm','Sh','Ss',
 export function renderMan(troffText) {
   // TODO reset global variables
   let html = '';
+  const callbacks = []
   
   for(let line of troffText.split(/\r?\n/)) {
     if(line === control_char || line === nonbreak_control_char) {
@@ -1110,7 +1128,7 @@ export function renderMan(troffText) {
         continue
       }
       let raw_args = match[3] === undefined ? '' : match[3]
-      let arg = (raw_args.match(/"(.*?)"|([^ ]+)/g) || []).map((s) => s.replace(/^"(.*)"$/, '$1'))
+      let arg = (raw_args.match(/"(.*?)"|((\\ |[^ ])+)/g) || []).map((s) => s.replace(/^"(.*)"$/, '$1'))
       
       let macro_results = []
       if(macro in macros) {
@@ -1137,6 +1155,9 @@ export function renderMan(troffText) {
           if('open' in macro_result && !('html' in macro_result)) {
             const classes = 'classes' in macro_result ? macro_result.classes : []
             html += `<${macro_result.open} class="${macro} ${classes.join(' ')}">`
+          }
+          if('callbacks' in macro_result) {
+            for(let cb in macro_result.callbacks) callbacks.push(cb)
           }
         }
       }

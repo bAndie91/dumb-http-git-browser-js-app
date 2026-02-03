@@ -44,7 +44,7 @@
 .TH .source {
   font-style: italic;
 }
-.TH .date {
+.TH .date, .Dd {
   font-variant-numeric: oldstyle-nums slashed-zero;
 }
 
@@ -155,4 +155,8 @@
 }
 .font-S /* \f(SM */ {
   font-variant: small-caps;
+}
+
+.Xr {
+  text-decoration: dotted underline;
 }
