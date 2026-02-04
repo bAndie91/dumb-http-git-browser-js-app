@@ -160,3 +160,9 @@
 .Xr {
   text-decoration: dotted underline;
 }
+
+.EX {
+  /* TODO block? */
+  white-space: pre;
+  font-family: monospace;
+}

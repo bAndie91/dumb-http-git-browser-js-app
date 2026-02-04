@@ -42,6 +42,8 @@ const prevailing_indent_stack = [ undefined ]
 let relative_margin_indent = 0
 let current_UR_target = undefined
 let current_UR_has_text = false
+let current_MT_target = undefined
+let current_MT_has_text = false
 
 
 function resolve_escape(name, param) {
@@ -136,6 +138,7 @@ function resolve_escape(name, param) {
     '->': '→',
     '<-': '←',
     '+-': '±',
+    '-+': '∓',
   })[name];
   if(r !== undefined) return r  
   
@@ -181,6 +184,11 @@ function unescape_cb(whole_match, group_1, group_2, pos) {
       let esc_param = m[1].replace(/[^\d+-]/g, '')  /* keep only the digits and +/- signs */
       return resolve_escape('s', esc_param)
     }
+    m = group_2.match(/^(\((.+)|\[(.+?)\])$/)
+    if(m) {
+      let esc_name = m[2] !== undefined ? m[2] : m[3]
+      return resolve_escape(esc_name, '')
+    }
     m = group_2.match(/^(.)(\((.+)|\[(.+?)\]|'(.+?)'|(.*))$/)
     if(m) {
       let esc_name = m[1]
@@ -195,13 +203,13 @@ function unescape_cb(whole_match, group_1, group_2, pos) {
     throw new Error(`don't know how to unescape: ${group}`)
   }
   else {
-    /* not escaped substring2 */
+    /* not escaped substring */
     return escapeHtml(group_1)
   }
 }
 function unescapeLine(line) {
   if(line === undefined) return ''
-  return line.replace(/(\\([acdeEprtu]|[fFgkmMnVY\*]\(..|[fFgkmMnVY\*]\[.*?\]|[AbBCDhHlLNoRSvwxXZ]'.*?'|[fFgkmMnOVYz].|[s]([+-]?\d|\([+-]?\d\d|[+-]\(\d\d|\[[+-]?\d+\]|[+-]?\[\d+\]|'[+-]?\d+'|[+-]?'\d+')|.|$)|[^\\]+)/g, unescape_cb)
+  return line.replace(/(\\(\(..|\[.*?\]|[acdeEprtu]|[fFgkmMnVY\*]\(..|[fFgkmMnVY\*]\[.*?\]|[AbBCDhHlLNoRSvwxXZ]'.*?'|[fFgkmMnOVYz].|[s]([+-]?\d|\([+-]?\d\d|[+-]\(\d\d|\[[+-]?\d+\]|[+-]?\[\d+\]|'[+-]?\d+'|[+-]?'\d+')|.|$)|[^\\]+)/g, unescape_cb)
 }
 
 function alternating(arg, tags) {
@@ -572,7 +580,7 @@ const macros = {
   },
 */
 /*
-       .nf       No filling or adjusting of output lines.
+       .nf       No filling or adjusting of output lines.  // TODO
        .nh       No hyphenation.
        .nm       Number mode off.
        .nm ±N [M [S [I]]]
@@ -1050,6 +1058,7 @@ const macros = {
   'RI': (arg, raw_args, html_args) => alternating(arg, ['font class="font-R"', 'i']),
   'SB': (arg, raw_args, html_args) => alternating(arg, ['font class="font-S"', 'b']),
   'SM': (arg, raw_args, html_args) => `<font class="font-S">${html_args}</font>`,
+  
   'LP': () => { alias: 'PP' },
   'P': () => { alias: 'PP' },
   'PP': () => {
@@ -1074,9 +1083,9 @@ const macros = {
   },
   'IP': (arg, raw_args, html_args) => {
     let tag
-    let indent
-    if(arg.length == 1) { tag = ''; indent = arg[0]; }
-    else { tag = unescapeLine(arg[0]); indent = arg[1]; }
+    let indentation
+    if(arg.length == 1) { tag = ''; indentation = arg[0]; }
+    else { tag = unescapeLine(arg[0]); indentation = arg[1]; }
     return `<p class="IP"><span class="IP-tag">${tag}</span>`  // TODO add hanging indentation
   },
   'TP': (arg, raw_args, html_args) => {
@@ -1085,11 +1094,10 @@ const macros = {
   'UR': (arg, raw_args, html_args) => {
     current_UR_target = html_args
     current_UR_has_text = false
-    return { html: `<a href="${html_args}" class="UR">`, callbacks: [{
-      trigger: ' ',
-      remover: 'UE',
-      func: (text) => { if(text) current_UR_has_text = true; },
-    }]}
+    return { html: `<a href="${html_args}" class="UR">`, callbacks: [
+      { event: 'output', func: (s) => { if(s) current_UR_has_text = true; return { repeat: !!s }; }, },
+      { macro: 'UE', order: 'before', func: () => undefined, repeat: false, }
+    ]}
   },
   'UE': (arg, raw_args, html_args) => {
     let html = ''
@@ -1097,12 +1105,37 @@ const macros = {
     html += `</a>${html_args}`
     current_UR_target = undefined
     return html
+    // TODO space before the closing tag is often unwanted. look into when is it proper to enable line_continuation
   },
+  'MT': (arg, raw_args, html_args) => {
+    current_MT_target = html_args
+    current_MT_has_text = false
+    return { html: `<a href="mailto:${html_args}" class="MT">`, callbacks: [
+      { event: 'output', func: (s) => { if(s) current_MT_has_text = true; return { repeat: !!s }; }, },
+      { macro: 'ME', order: 'before', func: () => undefined, repeat: false, }
+    ]}
+  },
+  'ME': (arg, raw_args, html_args) => {
+    let html = ''
+    if(!current_MT_has_text) html += current_MT_target
+    html += `</a>${html_args}`
+    current_MT_target = undefined
+    return html
+    // TODO space before the closing tag is often unwanted. look into when is it proper to enable line_continuation
+  },
+  'EX': (arg, raw_args, html_args) => `<span class="EX">${html_args}`,
+  'EE': (arg, raw_args, html_args) => `</span>${html_args}`,
   // 'DT': // TODO reset tabs
   // 'PD': () => {} // TODO set inter-paragraph vertical space
   'SS': (arg, raw_args, html_args) => `<h3 class="SS">${html_args}</h2>`,
   // TS
   // TE
+  
+  ' ': (line) => {
+    // plain text
+    // TODO handle completely empty lines
+    return { html: unescapeLine(line) }
+  }
 }
 
 const parsed_macros = ['It','Nm','Sh','Ss',
@@ -1120,56 +1153,88 @@ export function renderMan(troffText) {
     if(line === control_char || line === nonbreak_control_char) {
       continue
     }
-    else if(line[0] == control_char || line[0] == nonbreak_control_char) {
+    let macro
+    let raw_args
+    let macro_results = []
+    let new_callbacks = []
+    
+    if(line[0] == control_char || line[0] == nonbreak_control_char) {
       const match = line.substr(1).match(/^\s*(\S+)( (.*)|)$/)
-      let macro = match[1]
-      if(macro == '\\"') {
-        // comment
-        continue
+      macro = match[1]
+      raw_args = match[3] === undefined ? '' : match[3]
+    }
+    else {
+      macro = ' '  /* not a real macro, just plaintext */
+    }
+    
+    for(let idx = callbacks.length-1; idx >= 0; idx--) {
+      let cb = callbacks[idx]
+      if(cb.macro == macro && cb.order == 'before') {
+        const cb_res = cb.func(line)
+        if(cb.repeat === false || cb_res.repeat === false) callbacks.splice(idx, 1)
       }
-      let raw_args = match[3] === undefined ? '' : match[3]
+    }
+    
+    if(macro == '\\"') /* comment */ continue;
+    
+    if(macro != ' ') {
       let arg = (raw_args.match(/"(.*?)"|((\\ |[^ ])+)/g) || []).map((s) => s.replace(/^"(.*)"$/, '$1'))
       
-      let macro_results = []
       if(macro in macros) {
         let html_args = arg.map((a) => unescapeLine(a)).join(' ')
         let macro_result = macros[macro](arg, raw_args, html_args)
         if(typeof macro_result == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
         macro_results.push(macro_result)
       }
-      
-      for(let macro_result of macro_results) {
-        if(typeof macro_result == 'string') {
-          html += macro_result
-        }
-        else if(typeof macro_result == 'object') {
-          if('plaintext' in macro_result) {
-            html += escapeHtml(macro_result.plaintext)
-          }
-          if('html' in macro_result) {
-            html += macro_result.html
-          }
-          if('close' in macro_result) {
-            html += `</${macro_result.close}>`
-          }
-          if('open' in macro_result && !('html' in macro_result)) {
-            const classes = 'classes' in macro_result ? macro_result.classes : []
-            html += `<${macro_result.open} class="${macro} ${classes.join(' ')}">`
-          }
-          if('callbacks' in macro_result) {
-            for(let cb in macro_result.callbacks) callbacks.push(cb)
-          }
-        }
-      }
-      if(!(macro in macros)) {
-        console.log(`macro not supported: ${macro}`)
-      }
     }
     else {
-      // plain text
-      // TODO handle completely empty lines
-      html += unescapeLine(line)
+      let macro_result = macros[macro](line)
+      macro_results.push(macro_result)
     }
+    
+    let has_output = false
+    
+    for(let macro_result of macro_results) {
+      if(typeof macro_result == 'string') {
+        html += macro_result
+        has_output = true
+      }
+      else if(typeof macro_result == 'object') {
+        if('plaintext' in macro_result) {
+          html += escapeHtml(macro_result.plaintext)
+          has_output = true
+        }
+        if('html' in macro_result) {
+          html += macro_result.html
+          has_output = true
+        }
+        if('close' in macro_result) {
+          html += `</${macro_result.close}>`
+          has_output = true
+        }
+        if('open' in macro_result && !('html' in macro_result)) {
+          const classes = 'classes' in macro_result ? macro_result.classes : []
+          html += `<${macro_result.open} class="${macro} ${classes.join(' ')}">`
+          has_output = true
+        }
+        if('callbacks' in macro_result) {
+          for(let cb of macro_result.callbacks) new_callbacks.push(cb)
+        }
+      }
+    }
+    
+    if(!(macro in macros)) {
+      console.log(`macro not supported: ${macro}`)
+    }
+    
+    for(let idx = callbacks.length-1; idx >= 0; idx--) {
+      let cb = callbacks[idx]
+      if((cb.macro == macro && cb.order == 'after') || (cb.event == 'output' && has_output)) {
+        const cb_res = cb.func(line)
+        if(cb.repeat === false || cb_res.repeat === false) callbacks.splice(idx, 1)
+      }
+    }
+    for(let cb of new_callbacks) callbacks.push(cb)
     
     if(!line_continuation) html += ' '
     line_continuation = false
