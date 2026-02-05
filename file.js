@@ -1,6 +1,6 @@
 
 import { $, status, clear, state, reportException } from './common.js'
-import { explode } from './util.js'
+import { explode, urlSetParam } from './util.js'
 import { readObject } from './object.js'
 
 import { renderPOD } from './render-pod.js'
@@ -30,6 +30,7 @@ export async function selectFile(filePath, jumpToAnchor, forceFileFormat) {
   state.selectedFileEl = el
   el.classList.add('selected')
   state.selectedFilePath = filePath
+  urlSetParam('filepath', filePath)
   
   const basename = filePath.split('/').pop()
   status(`Loading file: ${filePath}`)

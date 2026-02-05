@@ -124,6 +124,25 @@ export function createMailtoLink(email) {
   return anchor
 }
 
+function encodeURLUnsafeChars(str) {
+  // Characters that are safe in query string values (per RFC 3986)
+  // Keep: A-Z a-z 0-9 - _ . ~ : / @ ! $ & ' ( ) * + , ; =
+  // Encode everything else
+  return String(str).replace(/[^A-Za-z0-9\-_.~:/@!$&''()*+,;=]/g, (char) => encodeURIComponent(char));
+}
+
+function buildLocationSearchString(params) {
+  const plist = []
+  for(let [key, val] of params.entries()) plist.push(`${encodeURLUnsafeChars(key)}=${encodeURLUnsafeChars(val)}`)
+  return plist.join('&');
+}
+
+export function urlSetParam(pname, pvalue) {
+  const params = new URLSearchParams(window.location.search);
+  params.set(pname, pvalue);
+  history.replaceState(null, '', '?' + buildLocationSearchString(params));
+}
+
 export function selectElements(selector, root = document) {
   const nodes = Array.from(root.querySelectorAll(selector))
 
