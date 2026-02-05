@@ -1,8 +1,8 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { explode, selectElements, formatDateTime, createMailtoLink } from './gitviewer-util.js'
-import { readObject } from './gitviewer-object.js'
-import { loadTree } from './gitviewer-tree.js'
+import { $, status, clear, state, reportException } from './common.js'
+import { explode, selectElements, formatDateTime, createMailtoLink } from './util.js'
+import { readObject } from './object.js'
+import { loadTree } from './tree.js'
 
 export function parseCommit(body) {
   const text = new TextDecoder().decode(body)

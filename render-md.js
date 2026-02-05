@@ -1,7 +1,7 @@
 
-import { state } from './gitviewer-common.js'
-import { slugify } from './gitviewer-util.js'
-import { mimeTypeFromFilename, getTreeEntryContent, resolveRelativePath } from './gitviewer-file.js'
+import { state } from './common.js'
+import { slugify } from './util.js'
+import { mimeTypeFromFilename, getTreeEntryContent, resolveRelativePath } from './file.js'
 
 const defaultMdRenderer = new marked.Renderer()
 const mdRenderer = new marked.Renderer()

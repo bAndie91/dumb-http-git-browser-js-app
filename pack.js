@@ -1,7 +1,7 @@
 
-import { $, status, clear, state, reportException, fetchText } from './gitviewer-common.js'
-import { readUint32BE, readVarInt, bytesToHex, hexToBytes, sha1hex } from './gitviewer-util.js';
-import { readObject } from './gitviewer-object.js'
+import { $, status, clear, state, reportException, fetchText } from './common.js'
+import { readUint32BE, readVarInt, bytesToHex, hexToBytes, sha1hex } from './util.js';
+import { readObject } from './object.js'
 
 const debug_pack_decompress = false
 

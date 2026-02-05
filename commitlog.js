@@ -1,8 +1,8 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { selectElements, formatDateTime } from './gitviewer-util.js'
-import { parseCommit, selectCommit } from './gitviewer-commit.js'
-import { readObject } from './gitviewer-object.js'
+import { $, status, clear, state, reportException } from './common.js'
+import { selectElements, formatDateTime } from './util.js'
+import { parseCommit, selectCommit } from './commit.js'
+import { readObject } from './object.js'
 
 var COMMITS_PER_PAGE = 5
 

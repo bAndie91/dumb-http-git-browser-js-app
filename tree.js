@@ -1,7 +1,7 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { readObject } from './gitviewer-object.js'
-import { selectFile } from './gitviewer-file.js'
+import { $, status, clear, state, reportException } from './common.js'
+import { readObject } from './object.js'
+import { selectFile } from './file.js'
 
 export function parseTree(body, path) {
   let i = 0

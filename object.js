@@ -1,7 +1,7 @@
 
-import { $, status, clear, state, reportException, fetchBinary } from './gitviewer-common.js'
-import { hexToBytes, equalBytes, sha1hex } from './gitviewer-util.js'
-import { readPackedObject } from './gitviewer-pack.js'
+import { $, status, clear, state, reportException, fetchBinary } from './common.js'
+import { hexToBytes, equalBytes, sha1hex } from './util.js'
+import { readPackedObject } from './pack.js'
 
 const objectCache = new Map(); // key: oidHex OR packOffset
 

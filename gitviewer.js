@@ -1,7 +1,7 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { loadPackfiles } from './gitviewer-pack.js'
-import { loadRefs } from './gitviewer-refs.js'
+import { $, status, clear, state, reportException } from './common.js'
+import { loadPackfiles } from './pack.js'
+import { loadRefs } from './refs.js'
 
 
 

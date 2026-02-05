@@ -1,5 +1,5 @@
 
-import { escapeHtml, slugify } from './gitviewer-util.js';
+import { escapeHtml, slugify } from './util.js';
 
 let control_char = '.'
 let nonbreak_control_char = "'"

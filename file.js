@@ -1,11 +1,11 @@
 
-import { $, status, clear, state, reportException } from './gitviewer-common.js'
-import { explode } from './gitviewer-util.js'
-import { readObject } from './gitviewer-object.js'
+import { $, status, clear, state, reportException } from './common.js'
+import { explode } from './util.js'
+import { readObject } from './object.js'
 
-import { renderPOD } from './gitviewer-render-pod.js'
-import { renderMarkdown } from './gitviewer-render-md.js'
-import { renderMan } from './gitviewer-render-man.js'
+import { renderPOD } from './render-pod.js'
+import { renderMarkdown } from './render-md.js'
+import { renderMan } from './render-man.js'
 
 export async function getTreeEntryContent(filePath) {
   // find tree entry

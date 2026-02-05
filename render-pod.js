@@ -1,5 +1,5 @@
 
-import { escapeHtml, slugify } from './gitviewer-util.js';
+import { escapeHtml, slugify } from './util.js';
 
 export function renderPOD(fileContent) {
    // POD documentation can start implicitly or with =pod
