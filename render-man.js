@@ -807,10 +807,11 @@ const macros = {
     return `<span class="command-argument Ar">${html_args}</span>`
   },
   'At': (arg, raw_args, html_args) => {
-     if(raw_args.match(/v[1-7]|32v/)) return { plaintext: `${raw_args} version of AT&T UNIX` }
-     if(raw_args.match(/III/))        return { plaintext: "AT&T System III UNIX" }
-     if(raw_args.match(/V|V\.[1-4]/)) return { plaintext: `${raw_args} version of AT&T System V UNIX` }
-     return ""
+    const rest = arg.slice(1).map((a) => unescapeLine(a)).join(' ')
+    if(arg[0].match(/v[1-7]|32v/)) return { plaintext: `version ${unescapeLine(arg[0])} of AT&T UNIX${rest}` }
+    if(arg[0].match(/III/))        return { plaintext: `AT&T System III UNIX${rest}` }
+    if(arg[0].match(/V|V\.[1-4]/)) return { plaintext: `version ${unescapeLine(arg[0])} of AT&T System V UNIX${rest}` }
+    return ""
   },
   'Bc': () => "]</div>",
   'Bd': (arg, raw_args, html_args) => {
@@ -838,9 +839,9 @@ const macros = {
   'Brc': () => "}</div>",
   'Bro': (arg, raw_args, html_args) => `<div class="Bro">{${html_args}`,
   'Brq': (arg, raw_args, html_args) => `<span class="Brq">{${html_args}}</span>`,
-  'Bsx': (arg, raw_args, html_args) => `<span class="BSDOS-version">${html_args || "&#xFFFD;"}</span>`,
+  'Bsx': (arg, raw_args, html_args) => `<span class="BSDOS-version">BSD/OS ${html_args || "&#xFFFD;"}</span>`,
   'Bt': () => "is currently in beta test.",
-  'Bx': (arg, raw_args, html_args) => `<span class="BSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Bx': (arg, raw_args, html_args) => `<span class="BSD-version">BSD ${html_args || "&#xFFFD;"}</span>`,
   'Cd': (arg, raw_args, html_args) => `<span class="kernel-config-declaration Cd">${html_args}</span>`,
   'Cm': (arg, raw_args, html_args) => `<span class="command-modifier Cm">${html_args}</span>`,
   'D1': (arg, raw_args, html_args) => `<div class="D1">${html_args}</div>`,
@@ -852,7 +853,7 @@ const macros = {
   'Dq': (arg, raw_args, html_args) => `<q>${html_args}</q>`,
   'Dt': (arg, raw_args, html_args) => `<h1>${html_args}</h1>`,  // TODO probably need to separate arguments: .Dt TITLE section [arch]
   // Dv
-  'Dx': (arg, raw_args, html_args) => `<span class="Dragonfly-version">${html_args || "&#xFFFD;"}</span>`,
+  'Dx': (arg, raw_args, html_args) => `<span class="Dragonfly-version">Dragonfly BSD ${html_args || "&#xFFFD;"}</span>`,
   'Ec': (arg, raw_args, html_args) => {
     let closing_delimiter = mdoc_Eo_stack.pop()
     if(html_args !== '') closing_delimiter = html_args
@@ -896,7 +897,7 @@ const macros = {
   'Fo': (arg, raw_args, html_args) => `<div class="function-block Fo"><span class="function-name">${html_args}</span>`,
   'Fr': (arg, raw_args, html_args) => `<i class="numerical-function-return-values Fr">${html_args}</i>`,
   'Ft': (arg, raw_args, html_args) => `<div class="function-type Ft">${html_args}</div>`,
-  'Fx': (arg, raw_args, html_args) => `<span class="FreeBSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Fx': (arg, raw_args, html_args) => `<span class="FreeBSD-version">FreeBSD ${unescapeLine(arg[0])}</span>`, // TODO rest ... arg[1..]
   'Hf': () => `<div class="Hf">&#xFFFD;</div>`,
   'Ic': (arg, raw_args, html_args) => `<span class="internal-command Ic">${html_args || "&#xFFFD;"}</span>`,
   'In': (arg, raw_args, html_args) => {
@@ -926,23 +927,25 @@ const macros = {
   'Nd': (arg, raw_args, html_args) => `<span class="Nd">${html_args}</span>`,  // TODO .Nd is an implicite block closed by .Sh
   'Nm': (arg, raw_args, html_args) => {
     // TODO .Nm is an implicite block (but only when invoked as the first macro in a SYNOPSIS section line) closed by an other .Nm, .Sh, or .Ss
-    if(mdoc_Nm === undefined) mdoc_Nm = html_args
-    return `<span class="Nm">${mdoc_Nm}</span>`
+    if(arg.length == 0) return `<span class="Nm">${mdoc_Nm}</span>`
+    mdoc_Nm = unescapeLine(arg[0])
+    const rest = arg.slice(1).map((a) => unescapeLine(a)).join(' ')
+    return `<span class="Nm">${mdoc_Nm}</span>${rest}`
   },
   'No': (arg, raw_args, html_args) => `<span class="No">${html_args}</span>`,
   'Ns': (arg, raw_args, html_args) => `<span class="Ns">${html_args}</span>`,  // TODO no space
-  'Nx': (arg, raw_args, html_args) => `<span class="NetBSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Nx': (arg, raw_args, html_args) => `<span class="NetBSD-version">NetBSD ${html_args || "&#xFFFD;"}</span>`,
   'Oc': () => "</div>",
   'Oo': (arg, raw_args, html_args) => `<div class="Oo">${html_args}`,
   'Op': (arg, raw_args, html_args) => `<span class="Op">[${html_args}]</span>`,
   'Os': (arg, raw_args, html_args) => `<span class="Os">${html_args}</span>`,
   'Ot': () => { alias: 'Ft' },
-  'Ox': (arg, raw_args, html_args) => `<span class="OpenBSD-version">${html_args || "&#xFFFD;"}</span>`,
+  'Ox': (arg, raw_args, html_args) => `<span class="OpenBSD-version">OpenBSD ${html_args || "&#xFFFD;"}</span>`,
   'Pa': (arg, raw_args, html_args) => `<span class="filesystem-path Pa">${html_args || "~"}</span>`,
   'Pc': () => ")</div>",
   'Pf': (arg, raw_args, html_args) => `<span class="Pf">${unescapeLine(arg[0])}</span>`,  // TODO no space after
   'Po': (arg, raw_args, html_args) => `<div class="Po">${html_args}`,
-  'Pp': () => 'TODO',  // TODO paragraph break or whatever block we are in
+  'Pp': () => '¶TODO¶',  // TODO paragraph break or whatever block we are in
   'Pq': (arg, raw_args, html_args) => `<div class="Pq">(${html_args}`,
   'Qc': () => "</div>",
   'Ql': (arg, raw_args, html_args) => `<span class="Ql">${html_args}</span>`,
@@ -1141,7 +1144,12 @@ const macros = {
 const parsed_macros = ['It','Nm','Sh','Ss',
   'Ac','Ao','Bc','Bo','Brc','Bro','Dc','Do','Ec','Eo','Fc','Oc','Oo','Pc','Po','Qc','Qo','Sc','So','Xc','Xo',
   'Aq','Bq','Brq','D1','Dl','Dq','En','Op','Pq','Ql','Qq','Sq','Vt', 'Ta',
-  'Ad','An','Ap','Ar','At','Bsx','Bx','Cd','Cm','Dv','Dx','Em','Er','Es','Ev','Fa','Fl','Fn','Fr','Ft','Fx','Ic','Li','Lk','Ms','Mt','Nm','No','Ns','Nx','Ot','Ox','Pa','Pf','St','Sx','Sy','Tn','Ux','Va','Vt','Xr']
+  'Ad','An','Ap','Ar','At','Bsx','Bx','Cd','Cm','Dv','Dx','Em','Er','Es','Ev','Fa','Fl','Fn','Fr','Ft','Fx','Ic','Li','Lk','Ms','Mt','Nm','No','Ns','Nx','Ot','Ox','Pa','Pf','Sx','Sy','Tn','Ux','Va','Vt','Xr',
+  'St']
+const callable_macros = [
+  'Ac','Ao','Bc','Bo','Brc','Bro','Dc','Do','Ec','Eo','Fc','Oc','Oo','Pc','Po','Qc','Qo','Sc','So','Xc','Xo',
+  'Aq','Bq','Brq','Dq','En','Op','Pq','Ql','Qq','Sq','Vt', 'Ta',
+  'Ad','An','Ap','Ar','At','Bsx','Bx','Cd','Cm','Dv','Dx','Em','Er','Es','Ev','Fa','Fl','Fn','Fr','Ft','Fx','Ic','Li','Lk','Ms','Mt','Nm','No','Ns','Nx','Ot','Ox','Pa','Pf','Sx','Sy','Tn','Ux','Va','Vt','Xr']
 
 
 export function renderMan(troffText) {
