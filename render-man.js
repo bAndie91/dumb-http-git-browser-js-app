@@ -240,18 +240,18 @@ function close_current_paragraph() {
 const macros = {
   /* groff macros (control commands) */
   
-  ab: function(arg, args) {
+  'ab': function(arg, args) {
     // .ab string
     // Print string on standard error, exit program.
     throw new Error(`troff processing aborted: ${args}`)
   },
-  ad: function(arg) {
+  'ad': function(arg) {
     // .ad       Begin line adjustment for output lines in current adjust mode.
     // .ad c     Start line adjustment in mode c (c=l,r,c,b,n).
     let adj_mod = arg[0] || last_adj_mode
     last_adj_mode = adj_mod
   },
-  af: function(arg) {
+  'af': function(arg) {
     // .af register c
     // Assign format c to register (c=l,i,I,a,A).
     const format = arg[1]  /* possible values: l i I a A */
@@ -279,7 +279,7 @@ const macros = {
        .ami1 macro end
                  Same as .ami but with compatibility mode switched off during macro expansion.
 */
-  as: function(arg) {
+  'as': function(arg) {
     // .as stringvar anything
     // Append anything to stringvar.
     troff_string[arg[0]] += arg[1]
@@ -292,7 +292,7 @@ const macros = {
        .backtrace
                  Print a backtrace of the input on stderr.
 */
-  bd: function(arg) {
+  'bd': function(arg) {
     // .bd font N
     // Embolden font by N-1 units.
     font_boldness[arg[0]] = arg[1]
@@ -310,12 +310,12 @@ const macros = {
        .boxa macro
                  Divert and append to macro, omitting a partially filled line.
 */
-  bp: function() {
+  'bp': function() {
     // .bp       Eject current page and begin new page.
     // .bp ±N    Eject current page; next page number ±N.
     return { html: '<hr/>' }
   },
-  br: function() {
+  'br': function() {
     // .br       Line break.
     return { html: '<br/>' }
   },
@@ -323,17 +323,17 @@ const macros = {
        .brp      Break output line; adjust if applicable.
        .break    Break out of a while loop.
 */
-  c2: function(arg) {
+  'c2': function(arg) {
     // .c2       Reset no-break control character to “'”.
     // .c2 c     Set no-break control character to c.
     nonbreak_control_char = arg.length == 0 ? "'" : arg[0]
   },
-  cc: function(arg) {
+  'cc': function(arg) {
     // .cc       Reset control character to ‘.’.
     // .cc c     Set control character to c.
     control_char = arg.length == 0 ? '.' : arg[0]
   },
-  ce: function(arg) {
+  'ce': function(arg) {
     //     .ce       Center the next input line.
     //     .ce N     Center following N input lines.
     center_lines_counter = arg.length == 0 ? 1 : arg[0]
@@ -363,7 +363,7 @@ const macros = {
        .cs font N M
                  Set constant character width mode for font to N/36 ems with em M.
 */
-  cu: function() {
+  'cu': function() {
     // .cu N     Continuous underline in nroff, like .ul in troff.
     current_classes['underline'] = 1
   },
@@ -399,7 +399,7 @@ const macros = {
        .di macro Divert to macro.  See groff_tmac(5) for more details.
        .do name  Interpret .name with compatibility mode disabled.
 */
-  ds: function(arg, args) {
+  'ds': function(arg, args) {
     // .ds stringvar anything
     // Set stringvar to anything.
     args = args.replace(/^[""]/, '')
@@ -411,14 +411,14 @@ const macros = {
        .dt N trap
                  Set diversion trap to position N (default scaling indicator v).
 */
-  ec: function(arg) {
+  'ec': function(arg) {
     escape_char = arg.length == 0 ? "\\" : arg[0]
   },
-  ecr: function() {
+  'ecr': function() {
     // .ecr      Restore escape character saved with .ecs.
     escape_char = escape_char_saved
   },
-  ecs: function() {
+  'ecs': function() {
     // .ecs      Save current escape character.
     escape_char_saved = escape_char
   },
@@ -427,19 +427,19 @@ const macros = {
                  Else part for if-else (.ie) request.
        .em macro The macro is run after the end of input.
 */
-  eo: function() {
+  'eo': function() {
     // .eo       Turn off escape character mechanism.
     enable_escpe_char = false
   },
 /*
-  ev: function(arg) {
+  'ev': function(arg) {
     // .ev       Switch to previous environment and pop it off the stack.
     // .ev env   Push down environment number or name env to the stack and switch to it.
   },
        .evc env  Copy the contents of environment env to the current environment.  No pushing or popping.
        .ex       Exit from roff processing.
 */
-  fam: function(arg) {
+  'fam': function(arg) {
     // .fam      Return to previous font family.
     // .fam name Set the current font family to name.
     if(arg.length == 0) {
@@ -466,7 +466,7 @@ const macros = {
       fill_color_stack.push(arg[0])
     }
   },
-  fi: function() {
+  'fi': function() {
     // .fi       Fill output lines.
     enable_fill = true
   },
@@ -483,7 +483,7 @@ const macros = {
        .fspecial font s1 s2 ...
                  When the current font is font, then the fonts s1, s2, ... are special.
 */
-  ft: function(arg) {
+  'ft': function(arg) {
     //     .ft       Return to previous font.  Same as \ or \.
     //     .ft font  Change to font name or number font; same as \f[font] escape sequence.
     if(arg.length == 0) {
@@ -574,7 +574,7 @@ const macros = {
        .na       No output-line adjusting.
 */
 /*
-  ne: function(arg) {
+  'ne': function(arg) {
     //   .ne       Need a one-line vertical space.
     //   .ne N     Need N vertical space (default scaling indicator v).
   },
@@ -588,11 +588,11 @@ const macros = {
        .nn       Do not number next line.
        .nn N     Do not number next N lines.
 */
-  nop: function() {
+  'nop': function() {
     //   .nop anything
     //             Always process anything.
   },
-  nr: function(arg) {
+  'nr': function(arg) {
     // .nr register ±N [M]
     // Define or modify register using ±N with auto-increment M.
     troff_register[arg[0]] = arg[1]  // TODO auto-increment(?) arg[2]
@@ -600,7 +600,7 @@ const macros = {
 /*
        .nroff    Make the built-in conditions n true and t false.
 */
-  ns: function() {
+  'ns': function() {
     //   .ns       Turn on no-space mode.
     nospace_mode = true
   },
@@ -647,7 +647,7 @@ const macros = {
        .rfschar f c1 c2 ...
                  Remove the definitions of entities c1, c2, ... for font f.
 */
-  rj: function(arg) {
+  'rj': function(arg) {
     //   .rj n     Right justify the next n input lines.
     right_justify_lines_counter = arg[0]
   },
@@ -658,12 +658,12 @@ const macros = {
        .rnn reg1 reg2
                  Rename register reg1 to reg2.
 */
-  rr: function(arg) {
+  'rr': function(arg) {
     //    .rr register
     //             Remove register.
     delete troff_register[arg[0]]
   },
-  rs: function() {
+  'rs': function() {
     //   .rs       Restore spacing; turn no-space mode off.
     nospace_mode = false
   },
@@ -680,7 +680,7 @@ const macros = {
        .so filename
                  Include source file.
 */
-  sp: function(arg) {
+  'sp': function(arg) {
     //   .sp       Skip one line vertically.
     //   .sp N     Space vertical distance N up or down according to sign of N (default scaling indicator v).
     let lines = arg.length == 0 ? 1 : arg[0]
@@ -718,7 +718,7 @@ const macros = {
        .tkf font s1 n1 s2 n2
                  Enable track kerning for font.
 */
-  tl: function(arg, args) {
+  'tl': function(arg, args) {
     //   .tl ’left’center’right’
     //             Three-part title.
     let delim = args.substr(0, 1)
@@ -745,7 +745,7 @@ const macros = {
        .troff    Make the built-in conditions t true and n false.
        .uf font  Set underline font to font (to be switched to by .ul).
 */
-  ul: function(arg) {
+  'ul': function(arg) {
     //   .ul N     Underline (italicize in troff) N input lines.
     underline_lines_counter = arg.length == 0 ? 1 : arg[0]
   },
@@ -1156,97 +1156,111 @@ export function renderMan(troffText) {
   // TODO reset global variables
   let html = '';
   const callbacks = []
+  let linenum = 0;
   
   for(let line of troffText.split(/\r?\n/)) {
-    if(line === control_char || line === nonbreak_control_char) {
-      continue
-    }
-    let macro
-    let raw_args
-    let macro_results = []
-    let new_callbacks = []
-    
-    if(line[0] == control_char || line[0] == nonbreak_control_char) {
-      const match = line.substr(1).match(/^\s*(\S+)( (.*)|)$/)
-      macro = match[1]
-      raw_args = match[3] === undefined ? '' : match[3]
-    }
-    else {
-      macro = ' '  /* not a real macro, just plaintext */
-    }
-    
-    for(let idx = callbacks.length-1; idx >= 0; idx--) {
-      let cb = callbacks[idx]
-      if(cb.macro == macro && cb.order == 'before') {
-        const cb_res = cb.func(line)
-        if(cb.repeat === false || cb_res.repeat === false) callbacks.splice(idx, 1)
+    linenum++;
+    try {
+      if(line === control_char || line === nonbreak_control_char) {
+        continue
       }
-    }
-    
-    if(macro == '\\"') /* comment */ continue;
-    
-    if(macro != ' ') {
-      let arg = (raw_args.match(/"(.*?)"|((\\ |[^ ])+)/g) || []).map((s) => s.replace(/^"(.*)"$/, '$1'))
+      let macro
+      let raw_args
+      let macro_results = []
+      let new_callbacks = []
       
-      if(macro in macros) {
-        let html_args = arg.map((a) => unescapeLine(a)).join(' ')
-        let macro_result = macros[macro](arg, raw_args, html_args)
-        if(typeof macro_result == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
+      if(line[0] == control_char || line[0] == nonbreak_control_char) {
+        const match = line.substr(1).match(/^\s*(\S+)( (.*)|)$/)
+        if(match) {
+          macro = match[1]
+          raw_args = match[3] === undefined ? '' : match[3]
+        }
+        else {
+          console.log(`Can not parse macro at input line ${linenum}, interpreting as text.`)
+          macro = ' '
+        }
+      }
+      else {
+        macro = ' '  /* not a real macro, just plaintext */
+      }
+      
+      for(let idx = callbacks.length-1; idx >= 0; idx--) {
+        let cb = callbacks[idx]
+        if(cb.macro == macro && cb.order == 'before') {
+          const cb_res = cb.func(line)
+          if(cb.repeat === false || cb_res.repeat === false) callbacks.splice(idx, 1)
+        }
+      }
+      
+      if(macro == '\\"') /* comment */ continue;
+      
+      if(macro != ' ') {
+        let arg = (raw_args.match(/"(.*?)"|((\\ |[^ ])+)/g) || []).map((s) => s.replace(/^"(.*)"$/, '$1'))
+        
+        if(macro in macros) {
+          let html_args = arg.map((a) => unescapeLine(a)).join(' ')
+          let macro_result = macros[macro](arg, raw_args, html_args)
+          if(typeof macro_result == 'object' && 'alias' in macro_result) macro_result = macros[macro_result.alias](arg, raw_args, html_args)
+          macro_results.push(macro_result)
+        }
+      }
+      else {
+        let macro_result = macros[macro](line)
         macro_results.push(macro_result)
       }
-    }
-    else {
-      let macro_result = macros[macro](line)
-      macro_results.push(macro_result)
-    }
-    
-    let has_output = false
-    
-    for(let macro_result of macro_results) {
-      if(typeof macro_result == 'string') {
-        html += macro_result
-        has_output = true
-      }
-      else if(typeof macro_result == 'object') {
-        if('plaintext' in macro_result) {
-          html += escapeHtml(macro_result.plaintext)
+      
+      let has_output = false
+      
+      for(let macro_result of macro_results) {
+        if(typeof macro_result == 'string') {
+          html += macro_result
           has_output = true
         }
-        if('html' in macro_result) {
-          html += macro_result.html
-          has_output = true
-        }
-        if('close' in macro_result) {
-          html += `</${macro_result.close}>`
-          has_output = true
-        }
-        if('open' in macro_result && !('html' in macro_result)) {
-          const classes = 'classes' in macro_result ? macro_result.classes : []
-          html += `<${macro_result.open} class="${macro} ${classes.join(' ')}">`
-          has_output = true
-        }
-        if('callbacks' in macro_result) {
-          for(let cb of macro_result.callbacks) new_callbacks.push(cb)
+        else if(typeof macro_result == 'object') {
+          if('plaintext' in macro_result) {
+            html += escapeHtml(macro_result.plaintext)
+            has_output = true
+          }
+          if('html' in macro_result) {
+            html += macro_result.html
+            has_output = true
+          }
+          if('close' in macro_result) {
+            html += `</${macro_result.close}>`
+            has_output = true
+          }
+          if('open' in macro_result && !('html' in macro_result)) {
+            const classes = 'classes' in macro_result ? macro_result.classes : []
+            html += `<${macro_result.open} class="${macro} ${classes.join(' ')}">`
+            has_output = true
+          }
+          if('callbacks' in macro_result) {
+            for(let cb of macro_result.callbacks) new_callbacks.push(cb)
+          }
         }
       }
-    }
-    
-    if(!(macro in macros)) {
-      console.log(`macro not supported: ${macro}`)
-      html += `<span class="unsupported-macro">${line}</span>`
-    }
-    
-    for(let idx = callbacks.length-1; idx >= 0; idx--) {
-      let cb = callbacks[idx]
-      if((cb.macro == macro && cb.order == 'after') || (cb.event == 'output' && has_output)) {
-        const cb_res = cb.func(line)
-        if(cb.repeat === false || cb_res.repeat === false) callbacks.splice(idx, 1)
+      
+      if(!(macro in macros)) {
+        console.log(`macro not supported: ${macro}`)
+        html += `<span class="unsupported-macro">${line}</span>`
       }
+      
+      for(let idx = callbacks.length-1; idx >= 0; idx--) {
+        let cb = callbacks[idx]
+        if((cb.macro == macro && cb.order == 'after') || (cb.event == 'output' && has_output)) {
+          const cb_res = cb.func(line)
+          if(cb.repeat === false || cb_res.repeat === false) callbacks.splice(idx, 1)
+        }
+      }
+      for(let cb of new_callbacks) callbacks.push(cb)
+      
+      if(!line_continuation) html += ' '
+      line_continuation = false
     }
-    for(let cb of new_callbacks) callbacks.push(cb)
-    
-    if(!line_continuation) html += ' '
-    line_continuation = false
+    catch (err) {
+      console.log(`Exception at input line ${linenum}: ${line}`)
+      throw err
+    }
   }
   return html;
 }
