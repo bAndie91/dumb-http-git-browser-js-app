@@ -1,3 +1,7 @@
+.unsupported-macro {
+  background-color: lightgrey;
+}
+
 .vertical-spacer {
   line-height: 1;
   height: 1em;

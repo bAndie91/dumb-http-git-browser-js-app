@@ -1,0 +1,50 @@
+html, body {
+  margin: 0;
+  height: 100%;
+  font-family: sans-serif;
+}
+
+header {
+  padding: 0.5em;
+  border-bottom: 1px solid #ccc;
+  display: flex;
+  gap: 0.5em;
+}
+
+#app {
+  height: calc(100% - 42px);
+}
+
+ul.dumbgitviewer, .dumbgitviewer ul {
+  margin: 0;
+  list-style: none;
+  padding-left: 0;
+}
+
+.dumbgitviewer li {
+  cursor: pointer;
+  --list-items-horizontal-padding: 4px;
+  padding: 2px var(--list-items-horizontal-padding);
+}
+
+.dumbgitviewer li:hover {
+  background: #eee;
+}
+
+pre {
+  white-space: pre;
+  font-family: monospace;
+}
+
+.selected {
+  background-color: #007acc22; /* light blue highlight */
+  border-left: 3px solid #007acc; /* accent color */
+  margin-left: -3px;
+}
+
+a[data-relative-link]::after {
+  content: "📄"; /* document icon */
+  font-size: 70%;
+  display: inline-block;
+  vertical-align: super;
+}

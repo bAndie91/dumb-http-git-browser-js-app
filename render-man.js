@@ -1233,6 +1233,7 @@ export function renderMan(troffText) {
     
     if(!(macro in macros)) {
       console.log(`macro not supported: ${macro}`)
+      html += `<span class="unsupported-macro">${line}</span>`
     }
     
     for(let idx = callbacks.length-1; idx >= 0; idx--) {

@@ -1,0 +1,34 @@
+.commit-datetime {
+  color: #888;           /* subtle gray */
+  font-size: 0.85em;     /* slightly smaller */
+  white-space: nowrap;
+}
+.commit-list-item .commit-datetime {
+  margin-right: 10px;     /* spacing before message */
+}
+.commit-list-item .commit-message-subject {
+  color: #222;           /* primary color */
+  font-weight: 500;
+}
+
+#commits-loader button {
+  margin: 0.25em;
+}
+
+#commitDetails .commit-hash {
+  font-family: monospace;
+}
+#commitDetails .commit-header {
+  font-weight: bold;
+}
+#commitDetails .commit-message {
+  margin-top: 0.75em;
+}
+#commitDetails .commit-aligned-header-lines {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.5em;
+}
+#commitDetails .commit-aligned-header-lines > .commit-header-line {
+  display: contents;
+}

@@ -1,0 +1,116 @@
+/* the long lines display mode switcher(s) */
+
+.long-lines-display-mode-switcher,
+#fileFormatSwitcher {
+  display: flex;
+  gap: 2px;
+  background: #ddd;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.long-lines-display-mode-switcher button,
+#fileFormatSwitcher button {
+  background: transparent;
+  border: none;
+  padding: 1px 5px;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
+  color: #666;
+}
+
+.long-lines-display-mode-switcher button:hover,
+#fileFormatSwitcher button:hover {
+  background: #ccc;
+  color: #333;
+}
+
+.long-lines-display-mode-switcher button[aria-checked="true"],
+#fileFormatSwitcher button[aria-checked="true"] {
+  background: #fff;
+  color: #000;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+
+/* long lines display mode - panes */
+
+.pane-inner.ellipsize-long-lines ul#refs > li,
+.pane-inner.ellipsize-long-lines .commit-list-item .commit-message-subject,
+.pane-inner.ellipsize-long-lines#commitDetails *,
+.pane-inner.ellipsize-long-lines ul#tree li,
+.pane-inner.ellipsize-long-lines #dumbgitviewerFile
+{
+  overflow: hidden;          /* required for ellipsis */
+  text-overflow: ellipsis;   /* show "…" when clipped */
+  white-space: nowrap;       /* prevent wrapping */
+}
+.pane-inner.ellipsize-long-lines#commitDetails .commit-message {
+  white-space: pre;
+}
+.pane-inner.hscroll-long-lines   ul#refs > li,
+.pane-inner.ellipsize-long-lines .commit-list-item,
+.pane-inner.hscroll-long-lines   .commit-list-item
+{
+  display: flex;
+}
+.pane-inner.hscroll-long-lines ul
+{
+  width: max-content;
+  min-width: 100%;
+  min-width: -moz-available; /* width: stretch; */
+}
+.pane-inner.hscroll-long-lines#commitDetails .commit-message {
+  white-space: pre;
+}
+.pane-inner.hscroll-long-lines ul#refs > li,
+.pane-inner.hscroll-long-lines .commit-list-item .commit-message-subject,
+.pane-inner.hscroll-long-lines#commitDetails,
+.pane-inner.hscroll-long-lines ul#tree > li,
+.pane-inner.hscroll-long-lines #dumbgitviewerFile
+{
+  white-space: nowrap;
+}
+.pane-inner.wrap-long-lines .commit-list-item .commit-message-subject
+{
+  white-space: normal;
+  word-wrap: break-word;
+}
+.pane-inner.wrap-long-lines ul#refs > li,
+.pane-inner.wrap-long-lines ul#tree > li
+{
+  word-wrap: anywhere;
+  text-indent: -0.5em;
+  padding-inline-start: calc(0.5em + var(--list-items-horizontal-padding));
+}
+.pane-inner.wrap-long-lines .commit-list-item
+{
+  display: block;
+}
+.pane-inner.wrap-long-lines#commitDetails .commit-message,
+.pane-inner.wrap-long-lines #dumbgitviewerFile[data-format=raw]
+{
+  white-space: pre-wrap;
+}
+.pane-inner.wrap-long-lines #dumbgitviewerFile
+{
+  white-space: normal;
+}
+.pane-inner.wrap-long-lines#commitDetails .commit-header-line
+{
+  word-wrap: anywhere;
+  text-indent: -0.5em;
+  padding-inline-start: 0.5em;
+}
+.pane-inner.wrap-long-lines#commitDetails .commit-aligned-header-lines,
+.pane-inner.wrap-long-lines#commitDetails .commit-aligned-header-lines .commit-header-line
+{
+  display: block;
+}
+.pane-inner.wrap-long-lines .commit-datetime
+{
+  white-space: normal;
+  word-wrap: unset;
+}

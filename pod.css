@@ -1,0 +1,18 @@
+.renderPOD .pod-command-unknown {
+  background-color: lightgrey;
+}
+.renderPOD em {
+  color: darkcyan;
+}
+.renderPOD .manpage-reference {
+  text-decoration: dotted underline;
+}
+.renderPOD.pod-mixed-non-pod .pod-portion {
+  background-color: whitesmoke;
+  margin: 1em 0;
+  padding: 0.1em 0.5em;
+}
+.renderPOD .non-pod-portion {
+  white-space: pre;
+  font-family: monospace;
+}

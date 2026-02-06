@@ -1,0 +1,16 @@
+#tree li.folder::before {
+  content: "📁";  /* folder icon */
+  padding-inline-end: 0.3em;
+}
+#tree li.folder.open::before {
+  content: "📂";  /* open folder icon */
+}
+#tree li.folder > ul {
+  display: none;
+  background-color: white;
+  background-color: Canvas;
+  margin-left: 1em;
+}
+#tree li.folder.open > ul {
+  display: block;
+}
