@@ -1,5 +1,6 @@
 
 import { $, status, clear, state, reportException } from './common.js'
+import { setUrlParam, getUrlParam } from './util.js'
 import { readObject } from './object.js'
 import { selectFile } from './file.js'
 
@@ -60,7 +61,7 @@ async function expandSubTree(li, oid) {
 }
 
 async function renderTree(parentElem, parentPath) {
-  const auto_filepath = new URLSearchParams(location.search).get('filepath')
+  const auto_filepath = getUrlParam('filepath')
   
   for (const entry of state.treeObjects.filter(entry => entry.path == parentPath)) {
     const filePath = parentPath + entry.filename

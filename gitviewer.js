@@ -1,5 +1,6 @@
 
 import { $, status, clear, state, reportException } from './common.js'
+import { setUrlParam, getUrlParam } from './util.js'
 import { loadPackfiles } from './pack.js'
 import { loadRefs } from './refs.js'
 
@@ -7,6 +8,7 @@ import { loadRefs } from './refs.js'
 
 async function loadRepo(repoUrl) {
   state.repoUrl = repoUrl
+  setUrlParam('repo', repoUrl)
   await loadPackfiles()
   await loadRefs()
 }
@@ -15,14 +17,12 @@ async function loadRepo(repoUrl) {
    Startup
 ----------------------------- */
 function init() {
-  const params = new URLSearchParams(location.search)
-  
-  const commits_per_page_param = params.get('commits_per_page')
+  const commits_per_page_param = getUrlParam('commits_per_page')
   if(commits_per_page_param) {
     COMMITS_PER_PAGE = commits_per_page_param
   }
 
-  const repo = params.get('repo')
+  const repo = getUrlParam('repo')
   if(repo) {
     $('repoUrl').value = repo
     reportException(loadRepo, repo)

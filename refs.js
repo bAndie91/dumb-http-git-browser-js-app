@@ -1,5 +1,6 @@
 
 import { $, status, clear, state, reportException, fetchText } from './common.js'
+import { setUrlParam, getUrlParam } from './util.js'
 import { loadMoreCommits } from './commitlog.js'
 
 export async function loadRefs() {
@@ -19,7 +20,7 @@ export async function loadRefs() {
   status('')
   
   // auto-select ref from URL
-  var autoloadRef = new URLSearchParams(location.search).get('ref')
+  var autoloadRef = getUrlParam('ref')
   if (autoloadRef) {
     autoloadRef = 'refs/'+autoloadRef
   }
@@ -66,6 +67,7 @@ async function selectRef(ref) {
   const el = document.querySelector(`[data-ref="${ref}"]`)
   state.selectedRefEl = el
   el.classList.add('selected')
+  setUrlParam('ref', ref.replace(/^(refs\/)/, ''))
   
   clear($('commits'))
   status(`Resolving ${ref}…`)

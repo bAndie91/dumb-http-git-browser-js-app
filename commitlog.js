@@ -1,6 +1,6 @@
 
 import { $, status, clear, state, reportException } from './common.js'
-import { selectElements, formatDateTime } from './util.js'
+import { selectElements, formatDateTime, setUrlParam, getUrlParam } from './util.js'
 import { parseCommit, selectCommit } from './commit.js'
 import { readObject } from './object.js'
 
@@ -23,7 +23,8 @@ export async function loadMoreCommits(loadAll) {
     const commitListItem = renderCommit(oid, commit)
     $('commits').appendChild(commitListItem)
 
-    if(oid == state.headOid) {
+    const autoload_commit = getUrlParam('commit')
+    if((autoload_commit && oid == autoload_commit) || (!autoload_commit && oid == state.headOid)) {
       selectCommit(oid)
     }
 

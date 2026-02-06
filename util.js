@@ -137,7 +137,12 @@ function buildLocationSearchString(params) {
   return plist.join('&');
 }
 
-export function urlSetParam(pname, pvalue) {
+export function getUrlParam(pname) {
+  const params = new URLSearchParams(window.location.search);
+  return params.get(pname);
+}
+
+export function setUrlParam(pname, pvalue) {
   const params = new URLSearchParams(window.location.search);
   params.set(pname, pvalue);
   history.replaceState(null, '', '?' + buildLocationSearchString(params));

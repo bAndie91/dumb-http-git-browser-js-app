@@ -1,6 +1,6 @@
 
 import { $, status, clear, state, reportException } from './common.js'
-import { explode, selectElements, formatDateTime, createMailtoLink } from './util.js'
+import { explode, selectElements, formatDateTime, createMailtoLink, setUrlParam } from './util.js'
 import { readObject } from './object.js'
 import { loadTree } from './tree.js'
 
@@ -56,6 +56,7 @@ export async function selectCommit(oid) {
   const el = document.querySelector(`[data-commithash="${oid}"]`)
   state.selectedCommitEl = el
   el.classList.add('selected')
+  setUrlParam('commit', oid)
 
   status('Loading commit…')
   const commitObj = await readObject(state.repoUrl, oid)
