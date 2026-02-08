@@ -15,6 +15,7 @@ const troff_string = {
 }
 const troff_env = {}
 const troff_register = {}
+const troff_tr = {}
 
 let last_adj_mode
 const font_boldness = []
@@ -49,7 +50,7 @@ let current_MT_has_text = false
 function resolve_escape(name, param) {
   if(name == '"' || name == '#') return 'TODO'  // TODO
   
-  const r = ({
+  let r = ({
     '´':  '´',
     'aa': '´',
     '`':  '`',
@@ -141,6 +142,8 @@ function resolve_escape(name, param) {
     '-+': '∓',
   })[name];
   if(r !== undefined) return r  
+  r = troff_tr['\\('+name]
+  if(r !== undefined) return r
   
   if(name == '*') return escapeHtml(troff_string[param]);
   if(name == 'n') return escapeHtml(troff_register[param]);
@@ -228,6 +231,12 @@ function prevailing_indent() {
   const indent = prevailing_indent_stack.slice(-1)[0]
   if(indent === undefined) return default_prevailing_indent
   return indent
+}
+function open_new_paragraph(classes) {
+  let res = close_current_paragraph()
+  res += `<p class="${classes}">`
+  in_paragraph = true
+  return res
 }
 function close_current_paragraph() {
   let res = ''
@@ -732,8 +741,16 @@ const macros = {
                  Print anything on stderr, allowing leading whitespace if anything starts with " (which is stripped off).
        .tmc anything
                  Similar to .tm1 without emitting a final newline.
-       .tr abcd...
-                 Translate a to b, c to d, etc. on output. TODO
+*/
+  'tr': function(arg) {
+    //   .tr abcd...
+    //             Translate a to b, c to d, etc. on output.
+    const chars = arg[0].match(/(\\(\(..|.)|.)/g)
+    for(let i = 0; i < chars.length; i++) {
+      troff_tr[chars[i]] = chars[i+1]
+    }
+  },
+/*
        .trf filename
                  Transparently output the contents of file filename.
        .trin abcd...
@@ -1067,8 +1084,8 @@ const macros = {
   'PP': () => {
     let html = close_current_paragraph()
     prevailing_indent_stack.push(undefined)
-    html += '<p>'  // TODO apply prevailing_indent
-    in_paragraph = true
+    // TODO apply prevailing_indent
+    html += open_new_paragraph()
     return html
   },
   'RS': (arg) => {
@@ -1080,9 +1097,8 @@ const macros = {
     prevailing_indent_stack.pop()
   },
   'HP': (arg) => {
-    let html = close_current_paragraph()
-    in_paragraph = true
-    return `<p class="HP">`  // TODO add arg[0] add hanging indentation
+    // TODO add arg[0] add hanging indentation
+    return open_new_paragraph("HP")
   },
   'IP': (arg, raw_args, html_args) => {
     let tag
@@ -1136,7 +1152,7 @@ const macros = {
   
   ' ': (line) => {
     // plain text
-    // TODO handle completely empty lines
+    if(line == '') return open_new_paragraph()
     return { html: unescapeLine(line) }
   }
 }
