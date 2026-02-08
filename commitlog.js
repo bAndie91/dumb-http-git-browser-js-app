@@ -23,8 +23,8 @@ export async function loadMoreCommits(loadAll) {
     const commitListItem = renderCommit(oid, commit)
     $('commits').appendChild(commitListItem)
 
-    const autoload_commit = getUrlParam('commit')
-    if((autoload_commit && oid == autoload_commit) || (!autoload_commit && oid == state.headOid)) {
+    const autoloadCommit = getUrlParam('commit')
+    if((autoloadCommit && oid == autoloadCommit) || (!autoloadCommit && oid == state.headOid)) {
       selectCommit(oid)
     }
 

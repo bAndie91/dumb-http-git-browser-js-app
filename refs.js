@@ -24,12 +24,20 @@ export async function loadRefs() {
   if (autoloadRef) {
     autoloadRef = 'refs/'+autoloadRef
   }
-  if (!autoloadRef || state.autoLoadedRef) {
-    await selectRef(state.headRef)
+  if (autoloadRef) {
+    if(refs.includes(autoloadRef)) {
+      await selectRef(autoloadRef)
+    }
   }
-  if(autoloadRef && refs.includes(autoloadRef) && !state.autoLoadedRef) {
-    await selectRef(autoloadRef)
-    state.autoLoadedRef = true
+  else {
+    var autoloadCommit = getUrlParam('commit')
+    if(autoloadCommit) {
+      state.commitQueue = [ autoloadCommit ]
+      await loadMoreCommits()
+    }
+    else {
+      await selectRef(state.headRef)
+    }
   }
 }
 

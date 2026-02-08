@@ -29,10 +29,7 @@ function init() {
   }
   $('loadRepoBtn').onclick = () => {
     const newRepoUrl = $('repoUrl').value.trim()
-    const prevRepoUrl = state.repoUrl
-    if(prevRepoUrl != newRepoUrl) {
-      state.autoLoadedRef = true
-    }
+    //const prevRepoUrl = state.repoUrl
     reportException(loadRepo, newRepoUrl)
   }
 }

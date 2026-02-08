@@ -10,7 +10,6 @@ export const state = {
   commitQueue: [],
   loadedCommits: 0,
   reachedRoot: false,
-  autoLoadedRef: false,
   selectedFilePath: null,
   
   treeObjects: [],   // list of {mode, type, oid, path, filename} of the current commit
